@@ -183,17 +183,19 @@ end
 --]]
 function SOTA_HandlePlayerBid(sender, message)
 	local playerInfo = SOTA_GetGuildPlayerInfo(sender);
-	if not playerInfo then
-		SOTA_whisper(sender, "Ты должен быть в гильдии, чтобы ставить!");
-		return;
-	end
-
+	local isGuildMember = (playerInfo ~= nil);
+	
+	-- Проверка, что игрок в рейде
 	local unitId = SOTA_GetUnitIDFromGroup(sender);
 	if not unitId then
 		return;
 	end
 
-	local availableDkp = 1 * (playerInfo[2]);
+	-- Для согильдейцев получаем их DKP, для не-согильдейцев DKP не ограничен
+	local availableDkp = 999999; -- Для не-согильдейцев нет лимита
+	if isGuildMember then
+		availableDkp = 1 * (playerInfo[2]);
+	end
 	
 	local cmd, arg
 	local spacepos = string.find(message, "%s");
@@ -232,8 +234,14 @@ function SOTA_HandlePlayerBid(sender, message)
 		if arg == "min" then
 			dkp = minimumBid;
 		elseif arg == "max" then
-			dkp = availableDkp;
-			userWentAllIn = true;
+			if isGuildMember then
+				dkp = availableDkp;
+				userWentAllIn = true;
+			else
+				-- Для не-согильдейцев "max" не поддерживается
+				SOTA_whisper(sender, "Команда 'max' доступна только согильдейцам. Укажи конкретную сумму.");
+				return;
+			end
 		else
 			-- This was not following a legal format; skip message
 			return;
@@ -256,18 +264,32 @@ function SOTA_HandlePlayerBid(sender, message)
 		hiRankIndex = highestBid[6];
 	end;
 
-	local bidderClass = playerInfo[3];		-- Info for the player placing the bid.
-	local bidderRank  = playerInfo[4];		-- This rank is by NAME
-	local bidderRIdx  = playerInfo[7];		-- This rank is by NUMBER!
+	-- Получаем информацию о ставящем
+	local bidderClass, bidderRank, bidderRIdx;
+	if isGuildMember then
+		bidderClass = playerInfo[3];		-- Info for the player placing the bid.
+		bidderRank  = playerInfo[4];		-- This rank is by NAME
+		bidderRIdx  = playerInfo[7];		-- This rank is by NUMBER!
+	else
+		-- Для не-согильдейцев используем дефолтные значения
+		local _, classEn = UnitClass(unitId);
+		bidderClass = classEn or "Unknown";
+		bidderRank  = "Гость";
+		bidderRIdx  = 99;					-- Низкий приоритет
+	end
 
-	if (dkp > availableDkp) then
-		SOTA_whisper(sender, string.format("У тебя только %d ДКП - ставка проигнорирована.", availableDkp));
-		return;
-	end;
+	-- Проверка DKP только для согильдейцев
+	if isGuildMember then
+		if (dkp > availableDkp) then
+			SOTA_whisper(sender, string.format("У тебя только %d ДКП - ставка проигнорирована.", availableDkp));
+			return;
+		end;
+	end
 
+	-- Проверка минимальной ставки для всех
 	if not(userWentAllIn) then
 		if (dkp < minimumBid) then
-			SOTA_whisper(sender, string.format("Нужно поставить %d ДКП - ставка проигнорирована.", minimumBid));
+			SOTA_whisper(sender, string.format("Нужно поставить минимум %d ДКП - ставка проигнорирована.", minimumBid));
 			return;
 		end;
 	else
