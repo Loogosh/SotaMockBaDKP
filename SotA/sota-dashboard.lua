@@ -294,6 +294,32 @@ function SOTA_HandleSOTACommand(msg)
 		end
 	end
 
+	if cmd == "raidcheck" then
+		sign = string.sub(arg, 1, 1);
+		--	Command: raid
+		--	Syntax: "raid -<%d>"
+		if sign == "+" then
+			arg = string.sub(arg, 2);
+			return SOTA_Call_AddRaidDKPAttendance(arg);
+		else
+			localEcho("DKP must be written as +999");
+			return;
+		end
+	end
+
+	if cmd == "raidnowipes" then
+		sign = string.sub(arg, 1, 1);
+		--	Command: raid
+		--	Syntax: "raid -<%d>"
+		if sign == "+" then
+			arg = string.sub(arg, 2);
+			return SOTA_Call_AddRaidDKPNoWipes(arg);
+		else
+			localEcho("DKP must be written as +999");
+			return;
+		end
+	end
+
 	if cmd == "range" then
 		sign = string.sub(arg, 1, 1);
 		--	Command: range

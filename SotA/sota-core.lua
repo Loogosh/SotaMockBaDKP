@@ -77,40 +77,44 @@ SOTA_CLASS_COLORS = {
 }
 
 
-SOTA_MSG_OnAnnounceBid		= "OnAnnounceBid";
-SOTA_MSG_OnAnnounceMinBid	= "OnAnnounceMinBid";	-- Deprecated; add "\n" to break lines!
-SOTA_MSG_On10SecondsLeft	= "On10SecondsLeft";
-SOTA_MSG_On9SecondsLeft		= "On9SecondsLeft";
-SOTA_MSG_On8SecondsLeft		= "On8SecondsLeft";
-SOTA_MSG_On7SecondsLeft		= "On7SecondsLeft";
-SOTA_MSG_On6SecondsLeft		= "On6SecondsLeft";
-SOTA_MSG_On5SecondsLeft		= "On5SecondsLeft";
-SOTA_MSG_On4SecondsLeft		= "On4SecondsLeft";
-SOTA_MSG_On3SecondsLeft		= "On3SecondsLeft";
-SOTA_MSG_On2SecondsLeft		= "On2SecondsLeft";
-SOTA_MSG_On1SecondLeft		= "On1SecondLeft";
-SOTA_MSG_OnMainspecBid		= "OnMainspecBid";
-SOTA_MSG_OnOffspecBid		= "OnOffspecBid";
-SOTA_MSG_OnMainspecMaxBid	= "OnMainspecMaxBid";
-SOTA_MSG_OnOffspecMaxBid	= "OnOffspecMaxBid";
-SOTA_MSG_OnOpen				= "OnAuctionOpened";
-SOTA_MSG_OnComplete			= "OnComplete";
-SOTA_MSG_OnPause			= "OnPause";
-SOTA_MSG_OnResume			= "OnResume";
-SOTA_MSG_OnClose			= "OnEnd";
-SOTA_MSG_OnCancel			= "OnCancel";
-SOTA_MSG_OnDKPAdded			= "OnDKPAddedPlayer";
-SOTA_MSG_OnDKPAddedRaid		= "OnDKPAddedRaid";
-SOTA_MSG_OnDKPAddedRange	= "OnDKPAddedRange";
-SOTA_MSG_OnDKPAddedQueue	= "OnDKPAddedQueue";
-SOTA_MSG_OnDKPSubtract		= "OnDKPSubtractedPlayer";
-SOTA_MSG_OnDKPSubtractRaid	= "OnDKPSubtractedRaid";
-SOTA_MSG_OnDKPPercent		= "OnDKPSubtractedPercent";
-SOTA_MSG_OnDKPShared		= "OnDKPShared";
-SOTA_MSG_OnDKPSharedQueue	= "OnDKPSharedQueue";
-SOTA_MSG_OnDKPSharedRange	= "OnDKPSharedRange";
-SOTA_MSG_OnDKPSharedRangeQ	= "OnDKPSharedRangeQueue";
-SOTA_MSG_OnDKPReplaced		= "OnDKPReplaced";
+SOTA_MSG_OnAnnounceBid					= "OnAnnounceBid";
+SOTA_MSG_OnAnnounceMinBid				= "OnAnnounceMinBid";	-- Deprecated; add "\n" to break lines!
+SOTA_MSG_ExtraInfo						= "ExtraInfo";
+SOTA_MSG_On10SecondsLeft				= "On10SecondsLeft";
+SOTA_MSG_On9SecondsLeft					= "On9SecondsLeft";
+SOTA_MSG_On8SecondsLeft					= "On8SecondsLeft";
+SOTA_MSG_On7SecondsLeft					= "On7SecondsLeft";
+SOTA_MSG_On6SecondsLeft					= "On6SecondsLeft";
+SOTA_MSG_On5SecondsLeft					= "On5SecondsLeft";
+SOTA_MSG_On4SecondsLeft					= "On4SecondsLeft";
+SOTA_MSG_On3SecondsLeft					= "On3SecondsLeft";
+SOTA_MSG_On2SecondsLeft					= "On2SecondsLeft";
+SOTA_MSG_On1SecondLeft					= "On1SecondLeft";
+SOTA_MSG_OnMainspecBid					= "OnMainspecBid";
+SOTA_MSG_OnOffspecBid					= "OnOffspecBid";
+SOTA_MSG_OnMainspecMaxBid				= "OnMainspecMaxBid";
+SOTA_MSG_OnOffspecMaxBid				= "OnOffspecMaxBid";
+SOTA_MSG_OnOpen							= "OnAuctionOpened";
+SOTA_MSG_OnComplete						= "OnComplete";
+SOTA_MSG_OnPause						= "OnPause";
+SOTA_MSG_OnResume						= "OnResume";
+SOTA_MSG_OnClose						= "OnEnd";
+SOTA_MSG_OnCancel						= "OnCancel";
+SOTA_MSG_OnBidCancel					= "OnBidCancel";
+SOTA_MSG_OnDKPAdded						= "OnDKPAddedPlayer";
+SOTA_MSG_OnDKPAddedRaid					= "OnDKPAddedRaid";
+SOTA_MSG_OnDKPAddedRaidAttendance		= "OnDKPAddedRaidAttendance";
+SOTA_MSG_OnDKPAddedRaidNoWipes			= "OnDKPAddedRaidNoWipes";
+SOTA_MSG_OnDKPAddedRange				= "OnDKPAddedRange";
+SOTA_MSG_OnDKPAddedQueue				= "OnDKPAddedQueue";
+SOTA_MSG_OnDKPSubtract					= "OnDKPSubtractedPlayer";
+SOTA_MSG_OnDKPSubtractRaid				= "OnDKPSubtractedRaid";
+SOTA_MSG_OnDKPPercent					= "OnDKPSubtractedPercent";
+SOTA_MSG_OnDKPShared					= "OnDKPShared";
+SOTA_MSG_OnDKPSharedQueue				= "OnDKPSharedQueue";
+SOTA_MSG_OnDKPSharedRange				= "OnDKPSharedRange";
+SOTA_MSG_OnDKPSharedRangeQ				= "OnDKPSharedRangeQueue";
+SOTA_MSG_OnDKPReplaced					= "OnDKPReplaced";
 
 
 
@@ -127,6 +131,8 @@ SOTA_CONFIG_OutputChannel		= WARN_CHANNEL;
 SOTA_CONFIG_Messages			= { }	-- Contains configurable raid messages (if any)
 SOTA_CONFIG_VersionNumber		= nil;	-- Increases for every change!
 SOTA_CONFIG_VersionDate			= nil;	-- Date of last change!
+-- SOTA_CONFIG_MinBid				= 100;
+-- SOTA_CONFIG_Step				= 100;
 
 
 -- Pane 2:
@@ -151,6 +157,9 @@ SOTA_HISTORY_DKP				= { }	-- { timestamp, tid, author, description, state, { nam
 
 -- Pane 4: (Messages)
 -- Pane 5: (Bid rules)
+
+SOTA_Minimum_Bid				= 0;
+SOTA_FirstBid 					= true;
 
 
 
@@ -192,8 +201,8 @@ function publicEcho(msgInfo)
 			localEcho("Unknown channel: ".. msgInfo[2]..", msg: "..msgInfo[3]);
 			return;
 		end;
-
-		SendChatMessage(string.format("[%s] %s", SOTA_TITLE, msgInfo[3]), channelName);
+		local mes = string.format("[%s] %s", SOTA_TITLE, msgInfo[3])
+		SendChatMessage(mes, channelName);
 	end;
 end;
 
@@ -203,6 +212,10 @@ end;
 
 function raidEcho(msg)
 	SendChatMessage(msg, RAID_CHANNEL);
+end
+
+function warnEcho(msg)
+	SendChatMessage(msg, WARN_CHANNEL);
 end
 
 function guildEcho(msg)
@@ -628,15 +641,15 @@ function SOTA_Call_CheckPlayerDKP(playername, sender)
 	if dkp then
 		dkp = 1 * dkp;
 		if sender then
-			SOTA_whisper(sender, string.format("%s have %d DKP.", playername, dkp));
+			SOTA_whisper(sender, string.format("%s имеет %d ДКП.", playername, dkp));
 		else
-			localEcho(string.format("%s have %d DKP.", playername, dkp));
+			localEcho(string.format("%s имеет %d ДКП.", playername, dkp));
 		end
 	else
 		if sender then
-			SOTA_whisper(sender, string.format("There are no DKP information for %s.", playername));
+			SOTA_whisper(sender, string.format("Нет информации о ДКП %s.", playername));
 		else
-			localEcho(string.format("There are no DKP information for %s.", playername));
+			localEcho(string.format("Нет информации о ДКП %s.", playername));
 		end
 	end
 end
@@ -659,17 +672,17 @@ function SOTA_Call_CheckClassDKP(playerclass, sender)
 	SOTA_SortTableDescending(classtable, 2);
 	
 	if sender then
-		SOTA_whisper(sender, string.format("Top %d DKP for %ss:", MAX_CLASS_DKP_WHISPERED, playerclass));
+		SOTA_whisper(sender, string.format("Топ %d ДКП для %ss:", MAX_CLASS_DKP_WHISPERED, playerclass));
 		for n=1, table.getn(classtable), 1 do
 			if n <= MAX_CLASS_DKP_WHISPERED then
-				SOTA_whisper(sender, string.format("%d - %s: %d DKP", n, classtable[n][1], 1*(classtable[n][2])));
+				SOTA_whisper(sender, string.format("%d - %s: %d ДКП", n, classtable[n][1], 1*(classtable[n][2])));
 			end
 		end
 	else
-		localEcho(string.format("Top %d DKP for %ss:", MAX_CLASS_DKP_DISPLAYED, playerclass));
+		localEcho(string.format("Топ %d ДКП для %ss:", MAX_CLASS_DKP_DISPLAYED, playerclass));
 		for n=1, table.getn(classtable), 1 do
 			if n <= MAX_CLASS_DKP_DISPLAYED then
-				localEcho(string.format("%d - %s: %d DKP", n, classtable[n][1], 1*(classtable[n][2])));
+				localEcho(string.format("%d - %s: %d ДКП", n, classtable[n][1], 1*(classtable[n][2])));
 			end
 		end
 	end
@@ -803,10 +816,10 @@ function SOTA_SubtractPlayerDKPPercent(playername, percent, silentmode)
 			SOTA_EchoEvent(SOTA_MSG_OnDKPPercent, "", minus, playername, "", percent);
 		end
 
-		SOTA_LogSingleTransaction("%Player", playername, -1 * abs(minus));
+		SOTA_LogSingleTransaction("%Игрок", playername, -1 * abs(minus));
 	else
 		if not silentmode then
-			localEcho(string.format("Player %s was not found", playername));
+			localEcho(string.format("Игрок %s не найден", playername));
 		end
 	end
 end
@@ -814,16 +827,182 @@ end
 --[[
 --	Add <n> DKP to all players in raid and in queue
 --]]
-function SOTA_Call_AddRaidDKP(dkp)
+function SOTA_Call_AddRaidDKP(arg)
 	if SOTA_IsInRaid(true) then
 		RaidState = RAID_STATE_ENABLED;
 		SOTA_RequestMaster();
-		SOTA_AddJob( function(job) SOTA_AddRaidDKP(job[2]) end, dkp, "_" )
+		SOTA_AddJob( function(job) SOTA_AddRaidDKP(job[2]) end, arg, "_" )
 		SOTA_RequestUpdateGuildRoster();
 	end
 end
 local SOTA_QueuedPlayersImpacted;
-function SOTA_AddRaidDKP(dkp, silentmode, callMethod)
+function SOTA_AddRaidDKP(arg, silentmode, callMethod)
+	SOTA_QueuedPlayersImpacteded = 0;
+	local _, _, dkp, boss = string.find(arg, "(%S+)%s+(.+)");
+	if SOTA_IsInRaid(true) then	
+		dkp = 1 * dkp;
+		
+		if not callMethod then
+			callMethod = "+Raid";
+		end
+		
+		local tidIndex = 1
+		local tidChanges = { }
+
+		local raidRoster = SOTA_GetRaidRoster();
+		for n=1, table.getn(raidRoster), 1 do
+			SOTA_ApplyPlayerDKP(raidRoster[n][1], dkp);
+			
+			tidChanges[tidIndex] = { raidRoster[n][1], dkp };
+			tidIndex = tidIndex + 1;
+		end
+		
+		local instance, zonename;
+		local zonecheck = SOTA_CONFIG_EnableZoneCheck;
+		local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
+		if zonecheck == 1 then
+			instance, zonename = SOTA_GetValidDKPZones();
+			if not instance then
+				zonecheck = 0;
+			end
+		end
+		
+		for n=1, table.getn(SOTA_RaidQueue), 1 do
+			local guildInfo = SOTA_GetGuildPlayerInfo(SOTA_RaidQueue[n][1]);
+
+			if guildInfo then
+				local eligibleForDKP = true;
+	
+				-- Player is OFFLINE, skip if not allowed
+				if guildInfo[5] == 0 and onlinecheck == 1 then
+					localEcho(string.format("No queue DKP for %s (Offline)", SOTA_RaidQueue[n][1]));
+					eligibleForDKP = false;
+				end
+				
+				-- Player is not in raid zone
+				if eligibleForDKP and guildInfo[5] == 1 and zonecheck == 1 then
+						if not(guildInfo[6] == instance or guildInfo[6] == zonename) then
+							localEcho(string.format("No queue DKP for %s (location: %s)", SOTA_RaidQueue[n][1], guildInfo[6]));
+							eligibleForDKP = false;
+						end;
+				end;
+								
+				if eligibleForDKP then				   
+					SOTA_ApplyPlayerDKP(SOTA_RaidQueue[n][1], dkp);				
+					tidChanges[tidIndex] = { SOTA_RaidQueue[n][1], dkp };
+					tidIndex = tidIndex + 1;
+					SOTA_QueuedPlayersImpacteded = SOTA_QueuedPlayersImpacteded + 1;
+				end
+			end
+		end
+		
+		if not silentmode then
+--			publicEcho(string.format("%d DKP was added to all players in raid", dkp));
+			SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRaid, "", dkp, "", "", boss);
+		end
+		
+		SOTA_LogMultipleTransactions(callMethod, tidChanges)				
+		return true;
+	end
+	return false;
+end
+
+--[[
+--	Add <n> DKP to all players in raid for attendance
+--]]
+function SOTA_Call_AddRaidDKPAttendance(arg)
+	if SOTA_IsInRaid(true) then
+		RaidState = RAID_STATE_ENABLED;
+		SOTA_RequestMaster();
+		SOTA_AddJob( function(job) SOTA_AddRaidDKPAttendance(job[2]) end, arg, "_" )
+		SOTA_RequestUpdateGuildRoster();
+	end
+end
+local SOTA_QueuedPlayersImpacted;
+function SOTA_AddRaidDKPAttendance(arg, silentmode, callMethod)
+	SOTA_QueuedPlayersImpacteded = 0;
+	local _, _, dkp, raid = string.find(arg, "(%S+)%s+(.+)");
+	if SOTA_IsInRaid(true) then	
+		dkp = 1 * dkp;
+		
+		if not callMethod then
+			callMethod = "+Raid";
+		end
+		
+		local tidIndex = 1
+		local tidChanges = { }
+
+		local raidRoster = SOTA_GetRaidRoster();
+		for n=1, table.getn(raidRoster), 1 do
+			SOTA_ApplyPlayerDKP(raidRoster[n][1], dkp);
+			
+			tidChanges[tidIndex] = { raidRoster[n][1], dkp };
+			tidIndex = tidIndex + 1;
+		end
+		
+		local instance, zonename;
+		local zonecheck = SOTA_CONFIG_EnableZoneCheck;
+		local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
+		if zonecheck == 1 then
+			instance, zonename = SOTA_GetValidDKPZones();
+			if not instance then
+				zonecheck = 0;
+			end
+		end
+		
+		for n=1, table.getn(SOTA_RaidQueue), 1 do
+			local guildInfo = SOTA_GetGuildPlayerInfo(SOTA_RaidQueue[n][1]);
+
+			if guildInfo then
+				local eligibleForDKP = true;
+	
+				-- Player is OFFLINE, skip if not allowed
+				if guildInfo[5] == 0 and onlinecheck == 1 then
+					localEcho(string.format("No queue DKP for %s (Offline)", SOTA_RaidQueue[n][1]));
+					eligibleForDKP = false;
+				end
+				
+				-- Player is not in raid zone
+				if eligibleForDKP and guildInfo[5] == 1 and zonecheck == 1 then
+						if not(guildInfo[6] == instance or guildInfo[6] == zonename) then
+							localEcho(string.format("No queue DKP for %s (location: %s)", SOTA_RaidQueue[n][1], guildInfo[6]));
+							eligibleForDKP = false;
+						end;
+				end;
+								
+				if eligibleForDKP then				   
+					SOTA_ApplyPlayerDKP(SOTA_RaidQueue[n][1], dkp);				
+					tidChanges[tidIndex] = { SOTA_RaidQueue[n][1], dkp };
+					tidIndex = tidIndex + 1;
+					SOTA_QueuedPlayersImpacteded = SOTA_QueuedPlayersImpacteded + 1;
+				end
+			end
+		end
+		
+		if not silentmode then
+--			publicEcho(string.format("%d DKP was added to all players in raid", dkp));
+			SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRaidAttendance, "", dkp, "", "", raid);
+		end
+		
+		SOTA_LogMultipleTransactions(callMethod, tidChanges)				
+		return true;
+	end
+	return false;
+end
+
+--[[
+--	Add <n> DKP to all players in raid for attendance
+--]]
+function SOTA_Call_AddRaidDKPNoWipes(dkp)
+	if SOTA_IsInRaid(true) then
+		RaidState = RAID_STATE_ENABLED;
+		SOTA_RequestMaster();
+		SOTA_AddJob( function(job) SOTA_AddRaidDKPNoWipes(job[2]) end, dkp, "_" )
+		SOTA_RequestUpdateGuildRoster();
+	end
+end
+local SOTA_QueuedPlayersImpacted;
+function SOTA_AddRaidDKPNoWipes(dkp, silentmode, callMethod)
 	SOTA_QueuedPlayersImpacteded = 0;
 
 	if SOTA_IsInRaid(true) then	
@@ -885,7 +1064,7 @@ function SOTA_AddRaidDKP(dkp, silentmode, callMethod)
 		
 		if not silentmode then
 --			publicEcho(string.format("%d DKP was added to all players in raid", dkp));
-			SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRaid, "", dkp);
+			SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRaidNoWipes, "", dkp);
 		end
 		
 		SOTA_LogMultipleTransactions(callMethod, tidChanges)				
@@ -1280,8 +1459,8 @@ function SOTA_DecayDKP(percent, silentmode)
 	end
 	
 	if not silentmode then
-		guildEcho("Guild DKP decay by "..percent.."% was performed by ".. UnitName("player") ..".")
-		guildEcho("Guild DKP removed a total of "..reducedDkp.." DKP from ".. playerCount .." players.")
+		guildEcho("Гильдейский дикей ДКП "..percent.."% был выполнен ".. UnitName("player") ..".")
+		guildEcho("Дикей снял "..reducedDkp.." ДКП С ".. playerCount .." игроков.")
 	end
 	
 	SOTA_LogMultipleTransactions("-Decay", tidChanges)
@@ -1461,7 +1640,7 @@ function SOTA_ApplyPlayerDKP(playername, dkpValue, silentmode)
    	end
    	
    	if not silentmode then
-   		localEcho(string.format("%s was not found in the guild; DKP was not updated.", playername));
+   		localEcho(string.format("%s не был найден в гильдии; ДКП не обновлено.", playername));
    	end
    	return false;
 end
@@ -1670,6 +1849,9 @@ end;
 
 
 function SOTA_GetStartingDKP()
+	-- if SOTA_CONFIG_MinimumBidStrategy == 0 then
+	-- 	return SOTA_CONFIG_MinBid
+	-- end
 	-- Deja Vu rules: starting bid is always 100 DKP
 	if SOTA_CONFIG_MinimumBidStrategy == 4 then
 		return 100;
@@ -1678,34 +1860,34 @@ function SOTA_GetStartingDKP()
 
 	-- TODO: Detect current instance (if any) and calculate starting DKP.
 	local startingDKP = 0;
-	local zonetext = GetRealZoneText();
-	local subzone = GetSubZoneText();
-	if not zonetext then
-		zonetext = "";
-	end
-	if not subzone then
-		subzone = ""
-	end
+	-- local zonetext = GetRealZoneText();
+	-- local subzone = GetSubZoneText();
+	-- if not zonetext then
+	-- 	zonetext = "";
+	-- end
+	-- if not subzone then
+	-- 	subzone = ""
+	-- end
 	
-	if zonetext == "Zul'Gurub" or zonetext == "Ruins of Ahn'Qiraj" --[[or (zonetext == "Gates of Ahn'Qiraj" and posX >= 0.422)]] then
-		startingDKP = SOTA_GetBossDKPValue("20Mans") / 10;				-- Verified
-	elseif zonetext == "Molten Core" then
-		startingDKP = SOTA_GetBossDKPValue("MoltenCore") / 10;			-- Verified
-	elseif zonetext == "Onyxia's Lair" --[[or (zonetext == "Dustwallow Marsh" and subzone == "Wyrmbog")]] then
-		startingDKP = SOTA_GetBossDKPValue("Onyxia") / 10;				-- Verified
-	elseif zonetext == "Blackwing Lair" then
-		startingDKP = SOTA_GetBossDKPValue("BlackwingLair") / 10;
-	elseif zonetext == "Ahn'Qiraj" --[[or (zonetext == "Gates of Ahn'Qiraj" and posX < 0.422)]] then
-		startingDKP = SOTA_GetBossDKPValue("AQ40") / 10;				-- Verified
-	elseif zonetext == "Naxxramas" then
-		startingDKP = SOTA_GetBossDKPValue("Naxxramas") / 10;
-	elseif	zonetext == "Feralas" or zonetext == "Ashenvale" or zonetext == "Azshara" or 
-			zonetext == "Duskwood" or zonetext == "Blasted Lands" or zonetext == "The Hinterlands" then
-		startingDKP = SOTA_GetBossDKPValue("WorldBosses") / 10;
-	else
-		-- Debug:
-		--echo("Unknown zone: ".. zonetext)
-	end	
+	-- if zonetext == "Zul'Gurub" or zonetext == "Ruins of Ahn'Qiraj" --[[or (zonetext == "Gates of Ahn'Qiraj" and posX >= 0.422)]] then
+	-- 	startingDKP = SOTA_GetBossDKPValue("20Mans") / 10;				-- Verified
+	-- elseif zonetext == "Molten Core" then
+	-- 	startingDKP = SOTA_GetBossDKPValue("MoltenCore") / 10;			-- Verified
+	-- elseif zonetext == "Onyxia's Lair" --[[or (zonetext == "Dustwallow Marsh" and subzone == "Wyrmbog")]] then
+	-- 	startingDKP = SOTA_GetBossDKPValue("Onyxia") / 10;				-- Verified
+	-- elseif zonetext == "Blackwing Lair" then
+	-- 	startingDKP = SOTA_GetBossDKPValue("BlackwingLair") / 10;
+	-- elseif zonetext == "Ahn'Qiraj" --[[or (zonetext == "Gates of Ahn'Qiraj" and posX < 0.422)]] then
+	-- 	startingDKP = SOTA_GetBossDKPValue("AQ40") / 10;				-- Verified
+	-- elseif zonetext == "Naxxramas" then
+	-- 	startingDKP = SOTA_GetBossDKPValue("Naxxramas") / 10;
+	-- elseif	zonetext == "Feralas" or zonetext == "Ashenvale" or zonetext == "Azshara" or 
+	-- 		zonetext == "Duskwood" or zonetext == "Blasted Lands" or zonetext == "The Hinterlands" then
+	-- 	startingDKP = SOTA_GetBossDKPValue("WorldBosses") / 10;
+	-- else
+	-- 	-- Debug:
+	-- 	--echo("Unknown zone: ".. zonetext)
+	-- end	
 
 	return startingDKP;
 end
@@ -1753,15 +1935,17 @@ end
 function SOTA_GetMinimumBid(bidtype)
 	local minimumBid = SOTA_GetStartingDKP();
 	if minimumBid == 0 then
-		minimumBid = 10;
+		minimumBid = SOTA_Minimum_Bid;
 	end
 
 	local highestBid = SOTA_GetHighestBid(bidtype);
 	if not highestBid then
+		SOTA_FirstBid = true;
 		-- This is first bid = the minimum
 		return minimumBid;
 	end
 	
+	SOTA_FirstBid = false;
 	--	OS bidders cannot bid if a MS bid is already placed!
 	if bidtype == 2 and highestBid[3] == 1 then
 		return nil
@@ -1784,7 +1968,7 @@ function SOTA_GetMinimumBid(bidtype)
 		minimumBid = strategyDejaVuRules(minimumBid);
 	else
 		-- Fallback strategy (no strategy)
-		minimumBid = minimumBid + 1;
+		minimumBid = minimumBid + 100;
 	end
 
 	return floor(minimumBid);
