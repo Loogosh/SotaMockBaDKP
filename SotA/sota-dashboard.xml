@@ -141,32 +141,84 @@
 							</OnLeave>
 						</Scripts>
 					</Button>
-					<!-- Button 2B: Share DKP ("Coins") -->
-					<Button name="$parentShareDKPButton" inherits="ActionButtonTemplate" frameStrata="HIGH" hidden="false">
-						<Size>
-							<AbsDimension x="32" y="32" />
-						</Size>
-						<Anchors>
-							<Anchor point="LEFT">
-								<Offset>
-									<AbsDimension x="260" y="0" />
-								</Offset>
-							</Anchor>
-						</Anchors>
-						<NormalTexture file="Interface\ICONS\INV_Misc_Coin_04.blp" />
-						<PushedTexture file="Interface\ICONS\INV_Misc_Coin_02.blp" />
-						<Scripts>
-							<OnClick>
-								SOTA_ShareBossDKP();
-							</OnClick>
-							<OnEnter>
-								SOTA_ShowDashboardToolTip(this, "Share DKP across Raid and Queue");
-							</OnEnter>
-							<OnLeave>
-								SOTA_HideDashboardToolTip(this);
-							</OnLeave>
-						</Scripts>
-					</Button>
+				<!-- Button 2B: Raid Boss DKP ("Skull") -->
+				<Button name="$parentRaidBossDKPButton" inherits="ActionButtonTemplate" frameStrata="HIGH" hidden="false">
+					<Size>
+						<AbsDimension x="32" y="32" />
+					</Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset>
+								<AbsDimension x="260" y="0" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<NormalTexture file="Interface\ICONS\Ability_Creature_Cursed_02.blp" />
+					<PushedTexture file="Interface\ICONS\Ability_Creature_Cursed_04.blp" />
+					<Scripts>
+						<OnClick>
+							SOTA_OpenRaidBossDKPDialog();
+						</OnClick>
+						<OnEnter>
+							SOTA_ShowDashboardToolTip(this, "Add Raid Boss DKP");
+						</OnEnter>
+						<OnLeave>
+							SOTA_HideDashboardToolTip(this);
+						</OnLeave>
+					</Scripts>
+				</Button>
+			<!-- Button 2C: Add Raid DKP ("Coins") -->
+			<Button name="$parentAddRaidDKPButton" inherits="ActionButtonTemplate" frameStrata="HIGH" hidden="false">
+				<Size>
+					<AbsDimension x="32" y="32" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT">
+						<Offset>
+							<AbsDimension x="296" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<NormalTexture file="Interface\ICONS\INV_Misc_Coin_04.blp" />
+				<PushedTexture file="Interface\ICONS\INV_Misc_Coin_02.blp" />
+				<Scripts>
+					<OnClick>
+						SOTA_OpenAddRaidDKPDialog();
+					</OnClick>
+					<OnEnter>
+						SOTA_ShowDashboardToolTip(this, "Начислить DKP всему рейду");
+					</OnEnter>
+					<OnLeave>
+						SOTA_HideDashboardToolTip(this);
+					</OnLeave>
+				</Scripts>
+			</Button>
+			<!-- Button 2D: Toggle DKP Notes Mode (Officer/Public) -->
+			<Button name="$parentToggleDKPNotesButton" inherits="ActionButtonTemplate" frameStrata="HIGH" hidden="false">
+				<Size>
+					<AbsDimension x="32" y="32" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT">
+						<Offset>
+							<AbsDimension x="332" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<NormalTexture file="Interface\ICONS\INV_Misc_Book_11.blp" />
+				<PushedTexture file="Interface\ICONS\INV_Misc_Book_11.blp" />
+				<Scripts>
+					<OnClick>
+						SOTA_ToggleDKPNotesMode();
+					</OnClick>
+					<OnEnter>
+						SOTA_ShowDKPNotesTooltip(this);
+					</OnEnter>
+					<OnLeave>
+						SOTA_HideDashboardToolTip(this);
+					</OnLeave>
+				</Scripts>
+			</Button>
 				</Frames>
 				<Layers>
 					<Layer level="ARTWORK">

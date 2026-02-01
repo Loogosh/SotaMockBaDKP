@@ -301,7 +301,7 @@ function SOTA_RemoveQueuedPlayerGroupNow(playername)
 
 	local guildInfo = SOTA_GetGuildPlayerInfo(playername);
 	if (guildInfo and guildInfo[5] == 1) then
-		SOTA_whisper(playername, "You were removed from the Raid Queue.")
+		SOTA_whisper(playername, "Ты удален из очереди рейда.")
 	end
 end
 
@@ -418,7 +418,7 @@ function SOTA_AddToRaidQueue(playername, playerrole, silentmode, byProxy)
 			if byProxy then
 				localEcho("Valid roles are tank, melee, ranged or healer.");
 			else
-				SOTA_whisper(playername, "Valid roles are tank, melee, ranged or healer.");
+				SOTA_whisper(playername, "Доступные роли: tank, melee, ranged, healer.");
 			end;
 		end
 		return false;
@@ -438,7 +438,7 @@ function SOTA_AddToRaidQueue(playername, playerrole, silentmode, byProxy)
 			if byProxy then
 				localEcho(string.format("%s need to be in the guild to join the raid queue!", playername));
 			else
-				SOTA_whisper(playername, "You need to be in the guild to join the raid queue!");
+				SOTA_whisper(playername, "Нужно быть в гильдии чтобы встать в очередь!");
 			end;
 		end
 		return false;
@@ -453,7 +453,7 @@ function SOTA_AddToRaidQueue(playername, playerrole, silentmode, byProxy)
 				if byProxy then
 					localEcho(string.format("%s is already in the raid.", playername));
 				else
-					SOTA_whisper(playername, "You are already in the raid.");
+					SOTA_whisper(playername, "Ты уже в рейде.");
 				end;
 			end
 			return false;
@@ -468,7 +468,7 @@ function SOTA_AddToRaidQueue(playername, playerrole, silentmode, byProxy)
 				if byProxy then
 					localEcho(string.format("%s is already queued as %s.", playername, playerrole));
 				else
-					SOTA_whisper(playername, string.format("You are already queued as %s.", playerrole));
+					SOTA_whisper(playername, string.format("Ты уже в очереди как %s.", playerrole));
 				end;
 			end
 			return false;
@@ -488,7 +488,7 @@ function SOTA_AddToRaidQueue(playername, playerrole, silentmode, byProxy)
 		if byProxy then
 			localEcho(string.format("%s is now queued as %s - Characters in queue: %d", playername, SOTA_UCFirst(playerrole), table.getn(SOTA_RaidQueue)));
 		else
-			SOTA_whisper(playername, string.format("You are now queued as %s - Characters in queue: %d", SOTA_UCFirst(playerrole), table.getn(SOTA_RaidQueue)));
+			SOTA_whisper(playername, string.format("Ты в очереди как %s - Всего в очереди: %d", SOTA_UCFirst(playerrole), table.getn(SOTA_RaidQueue)));
 		end;
 	end
 

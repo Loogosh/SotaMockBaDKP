@@ -233,7 +233,7 @@
 				</Scripts>
 			</Button>
 			<!-- Button row to control auction -->
-			<Button name="PauseAuctionButton" inherits="UIPanelButtonTemplate" text="Pause Auction">
+			<Button name="PauseAuctionButton" inherits="UIPanelButtonTemplate" text="Пауза">
 				<Size>
 					<AbsDimension x="120" y="23" />
 				</Size>
@@ -246,7 +246,7 @@
 					<OnClick>SOTA_OnPauseAuctionClick();</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="FinishAuctionButton" inherits="UIPanelButtonTemplate" text="Finish Auction">
+			<Button name="FinishAuctionButton" inherits="UIPanelButtonTemplate" text="Завершить">
 				<Size>
 					<AbsDimension x="120" y="23" />
 				</Size>
@@ -259,7 +259,7 @@
 					<OnClick>SOTA_OnFinishAuctionClick();</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="RestartAuctionButton" inherits="UIPanelButtonTemplate" text="Restart Auction">
+			<Button name="RestartAuctionButton" inherits="UIPanelButtonTemplate" text="Перезапуск">
 				<Size>
 					<AbsDimension x="120" y="23" />
 				</Size>
@@ -273,7 +273,7 @@
 				</Scripts>
 			</Button>
 			<!-- Button row to control AuctionUI -->
-			<Button name="AcceptBidButton" inherits="UIPanelButtonTemplate" text="Declare Winner">
+			<Button name="AcceptBidButton" inherits="UIPanelButtonTemplate" text="Выдать предмет">
 				<Size>
 					<AbsDimension x="120" y="23" />
 				</Size>
@@ -286,7 +286,7 @@
 					<OnClick>SOTA_OnAcceptBidClick();</OnClick>
 				</Scripts>
 			</Button>
-			<Button name="CancelAuctionButton" inherits="UIPanelButtonTemplate" text="Cancel Auction">
+			<Button name="CancelAuctionButton" inherits="UIPanelButtonTemplate" text="Отменить аукцион">
 				<Size>
 					<AbsDimension x="120" y="23" />
 				</Size>

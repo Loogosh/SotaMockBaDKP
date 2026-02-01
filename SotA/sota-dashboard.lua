@@ -250,7 +250,7 @@ function SOTA_HandleSOTACommand(msg)
 			end
 			return SOTA_AddToRaidQueueByName(arg);
 		else
-			localEcho("You must be promoted for adding people to the raid queue.");
+			localEcho("Нужно быть помощником для добавления игроков в очередь.");
 		end
 		return;
 	end
@@ -289,7 +289,7 @@ function SOTA_HandleSOTACommand(msg)
 			arg = string.sub(arg, 2);
 			return SOTA_Call_AddRaidDKP(arg);
 		else
-			localEcho("DKP must be written as +999 or -999");
+			localEcho("DKP должно быть в формате +999 или -999");
 			return;
 		end
 	end
@@ -302,7 +302,7 @@ function SOTA_HandleSOTACommand(msg)
 			arg = string.sub(arg, 2);
 			return SOTA_Call_AddRaidDKPAttendance(arg);
 		else
-			localEcho("DKP must be written as +999");
+			localEcho("DKP должно быть в формате +999");
 			return;
 		end
 	end
@@ -315,7 +315,7 @@ function SOTA_HandleSOTACommand(msg)
 			arg = string.sub(arg, 2);
 			return SOTA_Call_AddRaidDKPNoWipes(arg);
 		else
-			localEcho("DKP must be written as +999");
+			localEcho("DKP должно быть в формате +999");
 			return;
 		end
 	end
@@ -472,6 +472,7 @@ end
 
 function SOTA_OpenDashboard()
 	DashboardUIFrame:Show();
+	SOTA_RefreshDKPNotesButton();  -- Обновляем иконку при открытии
 end
 
 function SOTA_CloseDashboard()
@@ -486,6 +487,221 @@ end
 
 function SOTA_HideDashboardToolTip()
 	GameTooltip:Hide();
+end
+
+--[[
+--	Открывает диалог для начисления DKP всему рейду
+--]]
+function SOTA_OpenAddRaidDKPDialog()
+	StaticPopupDialogs["SOTA_POPUP_ADD_RAID_DKP"] = {
+		text = "Начислить DКП всему рейду:",
+		hasEditBox = true,
+		maxLetters = 30,
+		button1 = "Начислить",
+		button2 = "Отмена",
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+		OnShow = function()
+			local c = getglobal(this:GetName().."EditBox");
+			c:SetText("100");
+		end,
+		OnAccept = function(self, data)
+			local c = getglobal(this:GetParent():GetName().."EditBox");
+			local dkp = c:GetText();
+			if dkp and dkp ~= "" then
+				-- Используем простое начисление без имени босса
+				local dkpNum = tonumber(dkp);
+				if dkpNum then
+					SOTA_Call_AddRaidDKP(dkp .. " DKP");
+				else
+					localEcho("Ошибка: введи число DKP");
+				end
+			end
+		end
+	}
+	StaticPopup_Show("SOTA_POPUP_ADD_RAID_DKP");
+end
+
+--[[
+--	Определяет тип DKP по текущей зоне
+--	Возвращает: 0 = Officer Notes (Naxx/Kara), 1 = Public Notes (MC/Ony/BWL/AQ)
+--]]
+function SOTA_GetZoneDKPType()
+	local zonetext = GetRealZoneText();
+	if not zonetext then
+		return nil;  -- Неизвестная зона
+	end
+	
+	-- Officer Notes зоны (Naxx/Kara)
+	if zonetext == "Naxxramas" or zonetext == "Karazhan" then
+		return 0;  -- Officer Notes
+	end
+	
+	-- Public Notes зоны (MC/Ony/BWL/AQ)
+	if zonetext == "Molten Core" or zonetext == "Onyxia's Lair" or 
+	   zonetext == "Blackwing Lair" or zonetext == "Ahn'Qiraj" or
+	   zonetext == "Zul'Gurub" or zonetext == "Ruins of Ahn'Qiraj" then
+		return 1;  -- Public Notes
+	end
+	
+	return nil;  -- Не рейдовая зона
+end
+
+--[[
+--	Глобальная переменная для запоминания подтверждения несовпадения зоны
+--]]
+local SOTA_ZoneMismatchConfirmed = false;
+
+--[[
+--	Открывает диалог для начисления DKP за босса (или начисляет автоматически)
+--]]
+function SOTA_OpenRaidBossDKPDialog()
+	local zoneDKPType = SOTA_GetZoneDKPType();
+	local currentDKPType = SOTA_CONFIG_UseGuildNotes;
+	
+	-- Получаем Boss DKP по текущей зоне
+	local zonetext = GetRealZoneText();
+	local bossDkp = 0;
+	local zoneInstanceName = nil;
+	
+	if zonetext == "Molten Core" then
+		bossDkp = SOTA_GetBossDKPValue("MoltenCore");
+		zoneInstanceName = "Molten Core";
+	elseif zonetext == "Onyxia's Lair" then
+		bossDkp = SOTA_GetBossDKPValue("Onyxia");
+		zoneInstanceName = "Onyxia";
+	elseif zonetext == "Blackwing Lair" then
+		bossDkp = SOTA_GetBossDKPValue("BlackwingLair");
+		zoneInstanceName = "Blackwing Lair";
+	elseif zonetext == "Ahn'Qiraj" or zonetext == "Temple of Ahn'Qiraj" then
+		bossDkp = SOTA_GetBossDKPValue("AQ40");
+		zoneInstanceName = "AQ40";
+	elseif zonetext == "Naxxramas" then
+		bossDkp = SOTA_GetBossDKPValue("Naxxramas");
+		zoneInstanceName = "Naxxramas";
+	elseif zonetext == "Karazhan" or string.find(zonetext, "Karazhan") then
+		bossDkp = SOTA_GetBossDKPValue("UpperKarazhan");
+		zoneInstanceName = "Upper Karazhan";
+	end
+	
+	-- Проверка совпадения зоны и настройки (если в рейд-зоне)
+	if zoneDKPType ~= nil and zoneDKPType ~= currentDKPType and not SOTA_ZoneMismatchConfirmed then
+		local zoneNames = {
+			[0] = "Накс/Кара (Officer Notes)",
+			[1] = "MC/Ony/BWL/AQ (Public Notes)"
+		};
+		
+		local currentZoneName = zoneNames[zoneDKPType] or "текущая зона";
+		local targetDKPName = zoneNames[currentDKPType] or "выбранный DKP";
+		
+		StaticPopupDialogs["SOTA_CONFIRM_ZONE_MISMATCH"] = {
+			text = string.format("ВНИМАНИЕ!\n\nТы в зоне: %s\nНо начислишь DKP в: %s\n\nВсё правильно?", currentZoneName, targetDKPName),
+			button1 = "Да, начислить",
+			button2 = "Отмена",
+			timeout = 0,
+			whileDead = true,
+			hideOnEscape = true,
+			preferredIndex = 3,
+			OnAccept = function()
+				SOTA_ZoneMismatchConfirmed = true;
+				SOTA_OpenRaidBossDKPDialog();
+			end
+		}
+		StaticPopup_Show("SOTA_CONFIRM_ZONE_MISMATCH");
+		return;
+	end
+	
+	-- Сброс флага подтверждения
+	SOTA_ZoneMismatchConfirmed = false;
+	
+	-- АВТОНАЧИСЛЕНИЕ: Если в рейд-зоне и включена настройка EnableZoneCheck
+	if zoneDKPType ~= nil and SOTA_CONFIG_EnableZoneCheck == 1 and bossDkp > 0 and zoneInstanceName then
+		-- Автоматически начисляем без диалога!
+		SOTA_Call_AddRaidDKP(bossDkp .. " " .. zoneInstanceName);
+		localEcho(string.format("Автоначислено %d DKP за %s", bossDkp, zoneInstanceName));
+		return;
+	end
+	
+	-- РУЧНОЙ ВВОД: Если вне рейд-зоны или EnableZoneCheck выключен
+	if bossDkp == 0 then
+		bossDkp = 100;  -- Дефолтное значение
+	end
+	
+	StaticPopupDialogs["SOTA_POPUP_RAID_BOSS_DKP"] = {
+		text = "Начислить DКП за босса:",
+		hasEditBox = true,
+		maxLetters = 30,
+		button1 = "Начислить",
+		button2 = "Отмена",
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,
+		OnShow = function()
+			local c = getglobal(this:GetName().."EditBox");
+			c:SetText(bossDkp .. " ");
+		end,
+		OnAccept = function(self, data)
+			local c = getglobal(this:GetParent():GetName().."EditBox");
+			local input = c:GetText();
+			if input and input ~= "" then
+				SOTA_Call_AddRaidDKP(input);
+			end
+		end
+	}
+	StaticPopup_Show("SOTA_POPUP_RAID_BOSS_DKP");
+end
+
+--[[
+--	Переключает режим DKP Notes между Officer и Public
+--]]
+function SOTA_ToggleDKPNotesMode()
+	SOTA_ZoneMismatchConfirmed = false;  -- Сбрасываем подтверждение при переключении
+	
+	if SOTA_CONFIG_UseGuildNotes == 1 then
+		SOTA_CONFIG_UseGuildNotes = 0;
+		localEcho("Переключено на Officer Notes (Накс/Кара DKP) 📕");
+	else
+		SOTA_CONFIG_UseGuildNotes = 1;
+		localEcho("Переключено на Public Notes (MC/Ony/BWL/AQ DKP) 💎");
+	end
+	
+	SOTA_RefreshDKPNotesButton();
+end
+
+--[[
+--	Показывает tooltip для кнопки переключения DKP Notes
+--]]
+function SOTA_ShowDKPNotesTooltip(object)
+	GameTooltip:SetOwner(object, "ANCHOR_PRESERVE");
+	
+	if SOTA_CONFIG_UseGuildNotes == 1 then
+		GameTooltip:AddLine("DKP Mode: Public Notes", 0.3, 1, 0.3);
+		GameTooltip:AddLine("(MC/Ony/BWL/AQ/ZG/AQ20)", 1, 1, 1);
+		GameTooltip:AddLine(" ", 1, 1, 1);
+		GameTooltip:AddLine("Клик: переключить на Officer Notes", 0.5, 0.5, 1);
+	else
+		GameTooltip:AddLine("DKP Mode: Officer Notes", 1, 0.8, 0);
+		GameTooltip:AddLine("(Накс/Кара DKP)", 1, 1, 1);
+		GameTooltip:AddLine(" ", 1, 1, 1);
+		GameTooltip:AddLine("Клик: переключить на Public Notes", 0.5, 0.5, 1);
+	end
+	
+	GameTooltip:Show();
+end
+
+--[[
+--	Обновляет иконку кнопки переключения DKP Notes
+--]]
+--[[
+--	Обновляет иконку кнопки переключения DKP Notes
+--	Примечание: Динамическая смена текстуры в WoW 1.12 работает нестабильно,
+--	поэтому используется статичная иконка книги
+--]]
+function SOTA_RefreshDKPNotesButton()
+	-- Иконка книги статична, но tooltip и функционал работают
 end
 
 
@@ -615,7 +831,7 @@ function SOTA_RequestMaster(silentmode)
 		if silentmode then
 			debugEcho(string.format("Player %s have raid rank %d", playername, rank));
 		else
-			localEcho("You must be promoted before you can be a SOTA Master!");
+			localEcho("Нужно быть помощником чтобы стать SOTA мастером!");
 		end
 		return;
 	end
@@ -1328,12 +1544,12 @@ function SOTA_OnChatWhisper(event, message, sender)
 		SOTA_Call_ListQueue(sender);
 		
 	elseif cmd == "leave" then		
-		if SOTA_RemoveFromRaidQueue(sender) then
-			local guildInfo = SOTA_GetGuildPlayerInfo(sender);
-			if (guildInfo and guildInfo[5] == 1) then
-				SOTA_whisper(sender, "You have left the Raid Queue.")
+			if SOTA_RemoveFromRaidQueue(sender) then
+				local guildInfo = SOTA_GetGuildPlayerInfo(sender);
+				if (guildInfo and guildInfo[5] == 1) then
+					SOTA_whisper(sender, "Ты вышел из очереди рейда.")
+				end
 			end
-		end
 	end
 end	
 
@@ -1373,7 +1589,8 @@ function SOTA_OnLoad()
     
 	SOTA_SetAuctionState(STATE_NONE);
 	SOTA_RefreshRaidRoster();
-	SOTA_InitializeUI(); 
+	SOTA_InitializeUI();
+	SOTA_RefreshDKPNotesButton();  -- Инициализируем иконку при загрузке 
 	
 	SOTA_RequestUpdateGuildRoster()
 	

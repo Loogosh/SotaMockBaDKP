@@ -60,7 +60,15 @@ function SOTA_getConfigurableMessage(msgKey, item, dkp, bidder, rank, param1, pa
 	msg = string.gsub(msg, "$d", ""..dkp);
 	msg = string.gsub(msg, "$b", ""..bidder);
 	msg = string.gsub(msg, "$r", ""..rank);
-	msg = string.gsub(msg, "$m", ""..SOTA_GetMinimumBid());
+	
+	-- Защита от nil: SOTA_GetMinimumBid может вернуть nil
+	local minBid = SOTA_GetMinimumBid();
+	if minBid then
+		msg = string.gsub(msg, "$m", ""..minBid);
+	else
+		msg = string.gsub(msg, "$m", "0");
+	end
+	
 	msg = string.gsub(msg, "$s", UnitName("player"));
 	msg = string.gsub(msg, "$1", ""..param1);
 	msg = string.gsub(msg, "$2", ""..param2);
@@ -125,6 +133,7 @@ end
 function SOTA_CloseAllConfig()
 	FrameConfigBidding:Hide();
 	FrameConfigBossDkp:Hide();
+	FrameConfigItemDkp:Hide();
 	FrameConfigMiscDkp:Hide();
 	FrameConfigMessage:Hide();
 	FrameConfigBidRules:Hide();
@@ -151,6 +160,12 @@ end
 function SOTA_OpenBossDkpConfig()
 	SOTA_CloseAllConfig();
 	FrameConfigBossDkp:Show();
+end
+
+function SOTA_OpenItemDkpConfig()
+	SOTA_CloseAllConfig();
+	SOTA_RefreshItemDKPValues();
+	FrameConfigItemDkp:Show();
 end
 
 function SOTA_OpenMiscDkpConfig()
@@ -180,10 +195,10 @@ function SOTA_OnOptionAuctionTimeChanged(object)
 	
 	local valueString = "".. SOTA_CONFIG_AuctionTime;
 	if SOTA_CONFIG_AuctionTime == 0 then
-		valueString = "(No timer)";
+		valueString = "(Без таймера)";
 	end
 		
-	getglobal(object:GetName().."Text"):SetText(string.format("Auction Time: %s seconds", valueString))
+	getglobal(object:GetName().."Text"):SetText(string.format("Время аукциона: %s сек", valueString))
 end
 
 function SOTA_OnOptionAuctionExtensionChanged(object)
@@ -191,10 +206,10 @@ function SOTA_OnOptionAuctionExtensionChanged(object)
 	
 	local valueString = "".. SOTA_CONFIG_AuctionExtension;
 	if SOTA_CONFIG_AuctionExtension == 0 then
-		valueString = "(No extension)";
+		valueString = "(Без продления)";
 	end
 		
-	getglobal(object:GetName().."Text"):SetText(string.format("Auction Extension: %s seconds", valueString))
+	getglobal(object:GetName().."Text"):SetText(string.format("Продление аукциона: %s сек", valueString))
 end
 
 function SOTA_OnOptionDKPStringLengthChanged(object)
@@ -205,7 +220,7 @@ function SOTA_OnOptionDKPStringLengthChanged(object)
 		valueString = "(No limit)";
 	end
 		
-	getglobal(object:GetName().."Text"):SetText(string.format("DKP String Length: %s", valueString))
+	getglobal(object:GetName().."Text"):SetText(string.format("Длина строки DKP: %s", valueString))
 end
 
 function SOTA_OnOptionMinimumDKPPenaltyChanged(object)
@@ -216,7 +231,7 @@ function SOTA_OnOptionMinimumDKPPenaltyChanged(object)
 		valueString = "(None)";
 	end
 	
-	getglobal(object:GetName().."Text"):SetText(string.format("Minimum DKP penalty: %s", valueString))
+	getglobal(object:GetName().."Text"):SetText(string.format("Минимальный штраф DKP: %s", valueString))
 end
 
 function SOTA_RefreshBossDKPValues()
@@ -226,7 +241,104 @@ function SOTA_RefreshBossDKPValues()
 	getglobal("FrameConfigBossDkp_BlackwingLair"):SetValue(SOTA_GetBossDKPValue("BlackwingLair"));
 	getglobal("FrameConfigBossDkp_AQ40"):SetValue(SOTA_GetBossDKPValue("AQ40"));
 	getglobal("FrameConfigBossDkp_Naxxramas"):SetValue(SOTA_GetBossDKPValue("Naxxramas"));
+	getglobal("FrameConfigBossDkp_UpperKarazhan"):SetValue(SOTA_GetBossDKPValue("UpperKarazhan"));
 	getglobal("FrameConfigBossDkp_WorldBosses"):SetValue(SOTA_GetBossDKPValue("WorldBosses"));
+end
+
+function SOTA_RefreshItemDKPValues()
+	local itemList = SOTA_GetItemDKPList();
+	
+	-- Убийство босса (из Boss DKP) - используем функцию для безопасного получения значений
+	getglobal("FrameConfigItemDkp_Kill_BWL"):SetText(SOTA_GetBossDKPValue("BlackwingLair") or 200);
+	getglobal("FrameConfigItemDkp_Kill_AQ40"):SetText(SOTA_GetBossDKPValue("AQ40") or 300);
+	getglobal("FrameConfigItemDkp_Kill_NAXX"):SetText(SOTA_GetBossDKPValue("Naxxramas") or 100);
+	getglobal("FrameConfigItemDkp_Kill_KARA"):SetText(SOTA_GetBossDKPValue("UpperKarazhan") or 400);
+	
+	-- Одежда
+	getglobal("FrameConfigItemDkp_Cloth_BWL"):SetText(itemList[1][2]);
+	getglobal("FrameConfigItemDkp_Cloth_AQ40"):SetText(itemList[1][3]);
+	getglobal("FrameConfigItemDkp_Cloth_NAXX"):SetText(itemList[1][4]);
+	getglobal("FrameConfigItemDkp_Cloth_KARA"):SetText(itemList[1][5]);
+	
+	-- Пушка
+	getglobal("FrameConfigItemDkp_Gun_BWL"):SetText(itemList[2][2]);
+	getglobal("FrameConfigItemDkp_Gun_AQ40"):SetText(itemList[2][3]);
+	getglobal("FrameConfigItemDkp_Gun_NAXX"):SetText(itemList[2][4]);
+	getglobal("FrameConfigItemDkp_Gun_KARA"):SetText(itemList[2][5]);
+	
+	-- Ванда
+	getglobal("FrameConfigItemDkp_Wand_BWL"):SetText(itemList[3][2]);
+	getglobal("FrameConfigItemDkp_Wand_AQ40"):SetText(itemList[3][3]);
+	getglobal("FrameConfigItemDkp_Wand_NAXX"):SetText(itemList[3][4]);
+	getglobal("FrameConfigItemDkp_Wand_KARA"):SetText(itemList[3][5]);
+	
+	-- Кольца
+	getglobal("FrameConfigItemDkp_Ring_BWL"):SetText(itemList[4][2]);
+	getglobal("FrameConfigItemDkp_Ring_AQ40"):SetText(itemList[4][3]);
+	getglobal("FrameConfigItemDkp_Ring_NAXX"):SetText(itemList[4][4]);
+	getglobal("FrameConfigItemDkp_Ring_KARA"):SetText(itemList[4][5]);
+	
+	-- Тринкет
+	getglobal("FrameConfigItemDkp_Trinket_BWL"):SetText(itemList[5][2]);
+	getglobal("FrameConfigItemDkp_Trinket_AQ40"):SetText(itemList[5][3]);
+	getglobal("FrameConfigItemDkp_Trinket_NAXX"):SetText(itemList[5][4]);
+	getglobal("FrameConfigItemDkp_Trinket_KARA"):SetText(itemList[5][5]);
+	
+	-- Прочее
+	getglobal("FrameConfigItemDkp_Other_BWL"):SetText(itemList[6][2]);
+	getglobal("FrameConfigItemDkp_Other_AQ40"):SetText(itemList[6][3]);
+	getglobal("FrameConfigItemDkp_Other_NAXX"):SetText(itemList[6][4]);
+	getglobal("FrameConfigItemDkp_Other_KARA"):SetText(itemList[6][5]);
+end
+
+function SOTA_SaveItemDKPValues()
+	-- Сохраняем значения из EditBox'ов в конфиг
+	local itemList = SOTA_GetItemDKPList();
+	
+	-- Убийство босса (сохраняем в Boss DKP)
+	SOTA_SetBossDKPValue("BlackwingLair", tonumber(getglobal("FrameConfigItemDkp_Kill_BWL"):GetText()) or 200);
+	SOTA_SetBossDKPValue("AQ40", tonumber(getglobal("FrameConfigItemDkp_Kill_AQ40"):GetText()) or 300);
+	SOTA_SetBossDKPValue("Naxxramas", tonumber(getglobal("FrameConfigItemDkp_Kill_NAXX"):GetText()) or 100);
+	SOTA_SetBossDKPValue("UpperKarazhan", tonumber(getglobal("FrameConfigItemDkp_Kill_KARA"):GetText()) or 400);
+	
+	-- Одежда
+	itemList[1][2] = tonumber(getglobal("FrameConfigItemDkp_Cloth_BWL"):GetText()) or 200;
+	itemList[1][3] = tonumber(getglobal("FrameConfigItemDkp_Cloth_AQ40"):GetText()) or 400;
+	itemList[1][4] = tonumber(getglobal("FrameConfigItemDkp_Cloth_NAXX"):GetText()) or 100;
+	itemList[1][5] = tonumber(getglobal("FrameConfigItemDkp_Cloth_KARA"):GetText()) or 400;
+	
+	-- Пушка
+	itemList[2][2] = tonumber(getglobal("FrameConfigItemDkp_Gun_BWL"):GetText()) or 500;
+	itemList[2][3] = tonumber(getglobal("FrameConfigItemDkp_Gun_AQ40"):GetText()) or 500;
+	itemList[2][4] = tonumber(getglobal("FrameConfigItemDkp_Gun_NAXX"):GetText()) or 300;
+	itemList[2][5] = tonumber(getglobal("FrameConfigItemDkp_Gun_KARA"):GetText()) or 500;
+	
+	-- Ванда
+	itemList[3][2] = tonumber(getglobal("FrameConfigItemDkp_Wand_BWL"):GetText()) or 500;
+	itemList[3][3] = tonumber(getglobal("FrameConfigItemDkp_Wand_AQ40"):GetText()) or 500;
+	itemList[3][4] = tonumber(getglobal("FrameConfigItemDkp_Wand_NAXX"):GetText()) or 300;
+	itemList[3][5] = tonumber(getglobal("FrameConfigItemDkp_Wand_KARA"):GetText()) or 500;
+	
+	-- Кольца
+	itemList[4][2] = tonumber(getglobal("FrameConfigItemDkp_Ring_BWL"):GetText()) or 500;
+	itemList[4][3] = tonumber(getglobal("FrameConfigItemDkp_Ring_AQ40"):GetText()) or 900;
+	itemList[4][4] = tonumber(getglobal("FrameConfigItemDkp_Ring_NAXX"):GetText()) or 500;
+	itemList[4][5] = tonumber(getglobal("FrameConfigItemDkp_Ring_KARA"):GetText()) or 900;
+	
+	-- Тринкет
+	itemList[5][2] = tonumber(getglobal("FrameConfigItemDkp_Trinket_BWL"):GetText()) or 300;
+	itemList[5][3] = tonumber(getglobal("FrameConfigItemDkp_Trinket_AQ40"):GetText()) or 500;
+	itemList[5][4] = tonumber(getglobal("FrameConfigItemDkp_Trinket_NAXX"):GetText()) or 300;
+	itemList[5][5] = tonumber(getglobal("FrameConfigItemDkp_Trinket_KARA"):GetText()) or 500;
+	
+	-- Прочее
+	itemList[6][2] = tonumber(getglobal("FrameConfigItemDkp_Other_BWL"):GetText()) or 200;
+	itemList[6][3] = tonumber(getglobal("FrameConfigItemDkp_Other_AQ40"):GetText()) or 500;
+	itemList[6][4] = tonumber(getglobal("FrameConfigItemDkp_Other_NAXX"):GetText()) or 500;
+	itemList[6][5] = tonumber(getglobal("FrameConfigItemDkp_Other_KARA"):GetText()) or 500;
+	
+	SOTA_CONFIG_ItemDKP = itemList;
+	localEcho("Item DKP настройки сохранены!");
 end
 
 function SOTA_OnOptionBossDKPChanged(object)
@@ -252,6 +364,9 @@ function SOTA_OnOptionBossDKPChanged(object)
 	elseif slider == "FrameConfigBossDkp_Naxxramas" then
 		SOTA_SetBossDKPValue("Naxxramas", value);
 		valueString = string.format("Naxxramas: %d DKP", value);
+	elseif slider == "FrameConfigBossDkp_UpperKarazhan" then
+		SOTA_SetBossDKPValue("UpperKarazhan", value);
+		valueString = string.format("Upper Karazhan: %d DKP", value);
 	elseif slider == "FrameConfigBossDkp_WorldBosses" then
 		SOTA_SetBossDKPValue("WorldBosses", value);
 		valueString = string.format("World Bosses: %d DKP", value);
@@ -459,50 +574,19 @@ function SOTA_HandleCheckbox(checkbox)
 	end
 	
 	if checkbox:GetChecked() then		
-		--	Bid type:
-		--	If checked, then we need to uncheck others in same group:
+		--	Bid type: Только 3 стратегии (0, 1, 2)
 		if checkboxname == "FrameConfigMiscDkpMinBidStrategy0" then
 			getglobal("FrameConfigMiscDkpMinBidStrategy1"):SetChecked(0);
 			getglobal("FrameConfigMiscDkpMinBidStrategy2"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy3"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy4"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy5"):SetChecked(0);
 			SOTA_CONFIG_MinimumBidStrategy = 0;
-		elseif checkboxname == "FrameConfigBossDkpMinBidStrategy1" then
+		elseif checkboxname == "FrameConfigMiscDkpMinBidStrategy1" then
 			getglobal("FrameConfigMiscDkpMinBidStrategy0"):SetChecked(0);
 			getglobal("FrameConfigMiscDkpMinBidStrategy2"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy3"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy4"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy5"):SetChecked(0);
 			SOTA_CONFIG_MinimumBidStrategy = 1;
 		elseif checkboxname == "FrameConfigMiscDkpMinBidStrategy2" then
 			getglobal("FrameConfigMiscDkpMinBidStrategy0"):SetChecked(0);
 			getglobal("FrameConfigMiscDkpMinBidStrategy1"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy3"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy4"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy5"):SetChecked(0);
 			SOTA_CONFIG_MinimumBidStrategy = 2;
-		elseif checkboxname == "FrameConfigMiscDkpMinBidStrategy3" then
-			getglobal("FrameConfigMiscDkpMinBidStrategy0"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy1"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy2"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy4"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy5"):SetChecked(0);
-			SOTA_CONFIG_MinimumBidStrategy = 3;			
-		elseif checkboxname == "FrameConfigMiscDkpMinBidStrategy4" then
-			getglobal("FrameConfigMiscDkpMinBidStrategy0"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy1"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy2"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy3"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy5"):SetChecked(0);
-			SOTA_CONFIG_MinimumBidStrategy = 4;
-		elseif checkboxname == "FrameConfigMiscDkpMinBidStrategy5" then
-			getglobal("FrameConfigMiscDkpMinBidStrategy0"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy1"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy2"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy3"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy4"):SetChecked(0);
-			SOTA_CONFIG_MinimumBidStrategy = 5;
 		end
 	end
 end

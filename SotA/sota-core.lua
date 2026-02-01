@@ -139,17 +139,31 @@ SOTA_CONFIG_VersionDate			= nil;	-- Date of last change!
 SOTA_CONFIG_BossDKP				= { }
 local SOTA_CONFIG_DEFAULT_BossDKP = {
 	{ "20Mans",			200 },
-	{ "MoltenCore",		600 },
-	{ "Onyxia",			600 },
-	{ "BlackwingLair",	600 },
-	{ "AQ40",			800 },
-	{ "Naxxramas",		1200 },
+	{ "MoltenCore",		200 },
+	{ "Onyxia",			200 },
+	{ "BlackwingLair",	200 },
+	{ "AQ40",			300 },
+	{ "Naxxramas",		100 },
+	{ "UpperKarazhan",	400 },
 	{ "WorldBosses",	400 }
 }
+
+-- Pane 2.5: Item DKP (минимальные ставки на предметы)
+-- Формат: { ItemType, BWL, AQ40, NAXX, KARA40 }
+SOTA_CONFIG_ItemDKP				= { }
+local SOTA_CONFIG_DEFAULT_ItemDKP = {
+	{ "Одежда",		200, 400, 100, 400 },
+	{ "Пушка",		500, 500, 300, 500 },
+	{ "Ванда",		500, 500, 300, 500 },
+	{ "Кольца",		500, 900, 500, 900 },
+	{ "Тринкет",	300, 500, 300, 500 },
+	{ "Прочее",		200, 500, 500, 500 }
+}
+
 -- Pane 3:
 SOTA_CONFIG_Modified			= false;	-- If TRUE, then config number has been updated; FALSE: not.
 SOTA_CONFIG_UseGuildNotes		= 0;
-SOTA_CONFIG_MinimumBidStrategy	= 1;	-- 0: No strategy, 1: +10 DKP, 2: +10 %, 3: GGC rules, 4: DejaVu rules, 5: Custom rules
+SOTA_CONFIG_MinimumBidStrategy	= 1;	-- 0: Без правил (+100), 1: +100 DKP, 2: +10%
 SOTA_CONFIG_DKPStringLength		= 5;
 SOTA_CONFIG_MinimumDKPPenalty	= 50;	-- Minimum DKP withdrawn when doing percent DKP
 -- History: (basically a copy of the transaction log, but not shared with others)
@@ -371,36 +385,18 @@ function SOTA_RenumberTable(sourcetable)
 end
 
 function SOTA_SortTableAscending(sourcetable, index)
-	local doSort = true
-	while doSort do
-		doSort = false
-		for n=table.getn(sourcetable), 2, -1 do
-			local a = sourcetable[n - 1];
-			local b = sourcetable[n];
-			if (a[index]) > (b[index]) then
-				sourcetable[n - 1] = b;
-				sourcetable[n] = a;
-				doSort = true;
-			end
-		end
-	end
+	-- Оптимизировано: Bubble Sort O(n²) → table.sort O(n log n)
+	table.sort(sourcetable, function(a, b)
+		return a[index] < b[index]
+	end)
 	return sourcetable;
 end
 
 function SOTA_SortTableDescending(sourcetable, index)
-	local doSort = true
-	while doSort do
-		doSort = false
-		for n=1,table.getn(sourcetable) - 1, 1 do
-			local a = sourcetable[n]
-			local b = sourcetable[n + 1]
-			if (a[index]) < (b[index]) then
-				sourcetable[n] = b
-				sourcetable[n + 1] = a
-				doSort = true
-			end
-		end
-	end
+	-- Оптимизировано: Bubble Sort O(n²) → table.sort O(n log n)
+	table.sort(sourcetable, function(a, b)
+		return a[index] > b[index]
+	end)
 	return sourcetable;
 end
 
@@ -630,6 +626,56 @@ function SOTA_GetBossDKPList()
 	return SOTA_CONFIG_BossDKP;
 end
 
+function SOTA_GetItemDKPList()
+	if not SOTA_CONFIG_ItemDKP or table.getn(SOTA_CONFIG_ItemDKP) == 0 then
+		SOTA_CONFIG_ItemDKP = SOTA_CONFIG_DEFAULT_ItemDKP;
+	end
+	return SOTA_CONFIG_ItemDKP;
+end
+
+function SOTA_GetItemDKPValue(itemType, raidType)
+	local itemDkpList = SOTA_GetItemDKPList();
+	
+	-- Определяем индекс рейда: BWL=2, AQ40=3, NAXX=4, KARA40=5
+	local raidIndex = 2;  -- По умолчанию BWL
+	if raidType == "AQ40" then
+		raidIndex = 3;
+	elseif raidType == "NAXX" then
+		raidIndex = 4;
+	elseif raidType == "KARA40" then
+		raidIndex = 5;
+	end
+	
+	-- Ищем тип предмета
+	for n=1, table.getn(itemDkpList), 1 do
+		if itemDkpList[n][1] == itemType then
+			return tonumber(itemDkpList[n][raidIndex]);
+		end
+	end
+	
+	return 0;
+end
+
+function SOTA_SetItemDKPValue(itemType, raidType, dkpValue)
+	SOTA_GetItemDKPList();
+	
+	local raidIndex = 2;
+	if raidType == "AQ40" then
+		raidIndex = 3;
+	elseif raidType == "NAXX" then
+		raidIndex = 4;
+	elseif raidType == "KARA40" then
+		raidIndex = 5;
+	end
+	
+	for n=1, table.getn(SOTA_CONFIG_ItemDKP), 1 do
+		if SOTA_CONFIG_ItemDKP[n][1] == itemType then
+			SOTA_CONFIG_ItemDKP[n][raidIndex] = dkpValue;
+			break;
+		end
+	end
+end
+
 function SOTA_Call_CheckPlayerDKP(playername, sender)
 	if playername then
 		playername = SOTA_UCFirst(playername);
@@ -838,9 +884,26 @@ end
 local SOTA_QueuedPlayersImpacted;
 function SOTA_AddRaidDKP(arg, silentmode, callMethod)
 	SOTA_QueuedPlayersImpacteded = 0;
-	local _, _, dkp, boss = string.find(arg, "(%S+)%s+(.+)");
-	if SOTA_IsInRaid(true) then	
-		dkp = 1 * dkp;
+	
+	-- Парсим аргумент: "100 BossName" или просто "100"
+	local dkp, boss;
+	local _, _, dkpStr, bossName = string.find(arg, "(%S+)%s+(.+)");
+	
+	if dkpStr then
+		dkp = tonumber(dkpStr);
+		boss = bossName;
+	else
+		-- Только число без имени босса
+		dkp = tonumber(arg);
+		boss = "DKP";
+	end
+	
+	if not dkp then
+		localEcho("Ошибка: неверный формат DKP - " .. tostring(arg));
+		return false;
+	end
+	
+	if SOTA_IsInRaid(true) then
 		
 		if not callMethod then
 			callMethod = "+Raid";
@@ -1805,89 +1868,47 @@ end
 
 
 --
---	MinBidStrategy
+--	MinBidStrategy (Стратегии увеличения ставок)
 --
-local function strategy10DKP(dkp)
-	return 10 + dkp;
+local function strategy100DKP(dkp)
+	return 100 + dkp;  -- +100 DKP к текущей ставке
 end
 
 local function strategy10Percent(dkp)
-	return 1.10 * dkp;
+	return 1.10 * dkp;  -- +10% к текущей ставке
 end
-
---	Goldshire Golfclub rules:
---	0-200: +10 DKP
---	200-1K: +50 DKP
---	1K+: 100 DKP
-local function strategyGGCRules(dkp)
-	if dkp < 200 then
-		dkp = dkp + 10;
-	elseif dkp < 1000 then
-		dkp = dkp + 50;
-	else
-		dkp = dkp + 100;
-	end
-	
-	return dkp;
-end
-
--- Deja Vu rules:
--- Minimum bid: 100 DKP
---	100-4999: +100 DKP
--- 5000+: 1000 DKP
---
-local function strategyDejaVuRules(dkp)
-	if dkp < 100 then
-		dkp = 100;
-	elseif dkp < 5000 then
-		dkp = dkp + 100;
-	else 
-		dkp = dkp + 1000;
-	end;
-	return dkp;
-end;
 
 
 function SOTA_GetStartingDKP()
-	-- if SOTA_CONFIG_MinimumBidStrategy == 0 then
-	-- 	return SOTA_CONFIG_MinBid
-	-- end
-	-- Deja Vu rules: starting bid is always 100 DKP
-	if SOTA_CONFIG_MinimumBidStrategy == 4 then
-		return 100;
-	end;
-
-
-	-- TODO: Detect current instance (if any) and calculate starting DKP.
+	-- Автоматический расчет минимальной ставки по зоне
 	local startingDKP = 0;
-	-- local zonetext = GetRealZoneText();
-	-- local subzone = GetSubZoneText();
-	-- if not zonetext then
-	-- 	zonetext = "";
-	-- end
-	-- if not subzone then
-	-- 	subzone = ""
-	-- end
+	local zonetext = GetRealZoneText();
+	local subzone = GetSubZoneText();
+	if not zonetext then
+		zonetext = "";
+	end
+	if not subzone then
+		subzone = ""
+	end
 	
-	-- if zonetext == "Zul'Gurub" or zonetext == "Ruins of Ahn'Qiraj" --[[or (zonetext == "Gates of Ahn'Qiraj" and posX >= 0.422)]] then
-	-- 	startingDKP = SOTA_GetBossDKPValue("20Mans") / 10;				-- Verified
-	-- elseif zonetext == "Molten Core" then
-	-- 	startingDKP = SOTA_GetBossDKPValue("MoltenCore") / 10;			-- Verified
-	-- elseif zonetext == "Onyxia's Lair" --[[or (zonetext == "Dustwallow Marsh" and subzone == "Wyrmbog")]] then
-	-- 	startingDKP = SOTA_GetBossDKPValue("Onyxia") / 10;				-- Verified
-	-- elseif zonetext == "Blackwing Lair" then
-	-- 	startingDKP = SOTA_GetBossDKPValue("BlackwingLair") / 10;
-	-- elseif zonetext == "Ahn'Qiraj" --[[or (zonetext == "Gates of Ahn'Qiraj" and posX < 0.422)]] then
-	-- 	startingDKP = SOTA_GetBossDKPValue("AQ40") / 10;				-- Verified
-	-- elseif zonetext == "Naxxramas" then
-	-- 	startingDKP = SOTA_GetBossDKPValue("Naxxramas") / 10;
-	-- elseif	zonetext == "Feralas" or zonetext == "Ashenvale" or zonetext == "Azshara" or 
-	-- 		zonetext == "Duskwood" or zonetext == "Blasted Lands" or zonetext == "The Hinterlands" then
-	-- 	startingDKP = SOTA_GetBossDKPValue("WorldBosses") / 10;
-	-- else
-	-- 	-- Debug:
-	-- 	--echo("Unknown zone: ".. zonetext)
-	-- end	
+	if zonetext == "Zul'Gurub" or zonetext == "Ruins of Ahn'Qiraj" then
+		startingDKP = SOTA_GetBossDKPValue("20Mans") / 10;
+	elseif zonetext == "Molten Core" then
+		startingDKP = SOTA_GetBossDKPValue("MoltenCore") / 10;
+	elseif zonetext == "Onyxia's Lair" then
+		startingDKP = SOTA_GetBossDKPValue("Onyxia") / 10;
+	elseif zonetext == "Blackwing Lair" then
+		startingDKP = SOTA_GetBossDKPValue("BlackwingLair") / 10;
+	elseif zonetext == "Ahn'Qiraj" then
+		startingDKP = SOTA_GetBossDKPValue("AQ40") / 10;
+	elseif zonetext == "Naxxramas" then
+		startingDKP = SOTA_GetBossDKPValue("Naxxramas") / 10;
+	elseif zonetext == "Karazhan" then
+		startingDKP = SOTA_GetBossDKPValue("UpperKarazhan") / 10;
+	elseif zonetext == "Feralas" or zonetext == "Ashenvale" or zonetext == "Azshara" or 
+		zonetext == "Duskwood" or zonetext == "Blasted Lands" or zonetext == "The Hinterlands" then
+		startingDKP = SOTA_GetBossDKPValue("WorldBosses") / 10;
+	end
 
 	return startingDKP;
 end
@@ -1917,6 +1938,8 @@ function SOTA_GetValidDKPZones()
 		validZones = { zonetext, "Gates of Ahn'Qiraj" };
 	elseif zonetext == "Naxxramas" then 
 		validZones = { zonetext, "Eastern Plaguelands" };
+	elseif zonetext == "Karazhan" then 
+		validZones = { zonetext, "Deadwind Pass" };
 	elseif zonetext == "Feralas" or zonetext == "Ashenvale" or zonetext == "Azshara" or 
 		zonetext == "Duskwood" or zonetext == "Blasted Lands" or zonetext == "The Hinterlands" then
 		validZones = { zonetext, zonetext };
@@ -1953,21 +1976,12 @@ function SOTA_GetMinimumBid(bidtype)
 	
 	minimumBid = 1 * (highestBid[2]);
 
-	--echo("BidType="..bidtype ..", MinBid=".. minimumBid ..", strategy=".. SOTA_CONFIG_MinimumBidStrategy);
-
 	if SOTA_CONFIG_MinimumBidStrategy == 1 then
-		minimumBid = strategy10DKP(minimumBid);
+		minimumBid = strategy100DKP(minimumBid);
 	elseif SOTA_CONFIG_MinimumBidStrategy == 2 then
 		minimumBid = strategy10Percent(minimumBid);
-	elseif SOTA_CONFIG_MinimumBidStrategy == 3 then
-		minimumBid = strategyGGCRules(minimumBid);
-	elseif SOTA_CONFIG_MinimumBidStrategy == 4 then
-		minimumBid = strategyDejaVuRules(minimumBid);
-	elseif SOTA_CONFIG_MinimumBidStrategy == 5 then
-		-- TODO: Custom bidding currently does not define any custom min.bid strategy
-		minimumBid = strategyDejaVuRules(minimumBid);
 	else
-		-- Fallback strategy (no strategy)
+		-- Strategy 0 или неизвестная: +100 DKP
 		minimumBid = minimumBid + 100;
 	end
 
