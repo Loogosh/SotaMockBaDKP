@@ -119,7 +119,10 @@ GuildDKP            SOTA /command       SOTA !command       SOTA /w command     
 --]]
 SLASH_SOTA_DEFAULT_COMMAND1 = "/SOTA"
 SlashCmdList["SOTA_DEFAULT_COMMAND"] = function(msg)
-	SOTA_HandleSOTACommand(msg);
+	local success, err = pcall(SOTA_HandleSOTACommand, msg);
+	if not success then
+		localEcho("Ошибка выполнения команды: " .. tostring(err));
+	end
 end
 
 
@@ -167,7 +170,60 @@ function SOTA_HandleSOTACommand(msg)
 	--	Command: config
 	--	Syntax: "config"	
 	if cmd == "cfg" or cmd == "config" then
-		SOTA_OpenConfigurationUI();
+		-- Проверяем, загружен ли sota-options.lua
+		if SOTA_OpenConfigurationUI then
+			SOTA_OpenConfigurationUI();
+		elseif SOTA_ToggleConfigurationUI then
+			-- Альтернативный способ открытия конфига
+			SOTA_ToggleConfigurationUI();
+		else
+			localEcho("SOTA: Configuration UI not loaded yet. Please wait a moment and try again.");
+		end
+		return;
+	end
+
+	--	Command: resetconfig
+	--	Syntax: "resetconfig"	
+	if cmd == "resetconfig" then
+		SOTA_ResetAllSettingsToDefault();
+		-- Обновляем UI, если окно настроек открыто
+		if SOTA_IsConfigurationDialogOpen and SOTA_IsConfigurationDialogOpen() then
+			local frame;
+			-- Обновляем все чекбоксы
+			frame = getglobal("FrameConfigBiddingMSoverOSPriority");
+			if frame then frame:SetChecked(SOTA_CONFIG_EnableOSBidding); end
+			frame = getglobal("FrameConfigBiddingEnableZonecheck");
+			if frame then frame:SetChecked(SOTA_CONFIG_EnableZoneCheck); end
+			frame = getglobal("FrameConfigBiddingEnableOnlinecheck");
+			if frame then frame:SetChecked(SOTA_CONFIG_EnableOnlineCheck); end
+			frame = getglobal("FrameConfigBiddingAllowPlayerPass");
+			if frame then frame:SetChecked(SOTA_CONFIG_AllowPlayerPass); end
+			frame = getglobal("FrameConfigBiddingDisableDashboard");
+			if frame then frame:SetChecked(SOTA_CONFIG_DisableDashboard); end
+			
+			-- Обновляем Misc DKP
+			local misc0 = getglobal("FrameConfigMiscDkpMinBidStrategy0");
+			local misc1 = getglobal("FrameConfigMiscDkpMinBidStrategy1");
+			local misc2 = getglobal("FrameConfigMiscDkpMinBidStrategy2");
+			if misc0 then misc0:SetChecked(0); end
+			if misc1 then misc1:SetChecked(0); end
+			if misc2 then misc2:SetChecked(0); end
+			local miscActive = getglobal("FrameConfigMiscDkpMinBidStrategy".. SOTA_CONFIG_MinimumBidStrategy);
+			if miscActive then miscActive:SetChecked(1); end
+			
+			-- Обновляем слайдеры
+			frame = getglobal("FrameConfigBiddingAuctionTime");
+			if frame then frame:SetValue(SOTA_CONFIG_AuctionTime); end
+			frame = getglobal("FrameConfigBiddingAuctionExtension");
+			if frame then frame:SetValue(SOTA_CONFIG_AuctionExtension); end
+			frame = getglobal("FrameConfigMiscDkpDKPStringLength");
+			if frame then frame:SetValue(SOTA_CONFIG_DKPStringLength); end
+			frame = getglobal("FrameConfigMiscDkpMinimumDKPPenalty");
+			if frame then frame:SetValue(SOTA_CONFIG_MinimumDKPPenalty); end
+			
+			-- Обновляем Boss DKP
+			SOTA_RefreshBossDKPValues();
+		end
 		return;	
 	end
 
@@ -277,21 +333,29 @@ function SOTA_HandleSOTACommand(msg)
 	
 	
 	if cmd == "raid" then
+		if not arg or arg == "" then
+			localEcho("DKP должно быть в формате +999 или -999");
+			return;
+		end
+		
 		sign = string.sub(arg, 1, 1);
 		--	Command: raid
 		--	Syntax: "raid -<%d>"
 		if sign == "-" then
 			arg = string.sub(arg, 2);
-			return SOTA_Call_SubtractRaidDKP(arg);
+			if arg and arg ~= "" then
+				return SOTA_Call_SubtractRaidDKP(arg);
+			end
 		--	Command: raid
 		--	Syntax: "raid +<%d>"
 		elseif sign == "+" then
 			arg = string.sub(arg, 2);
-			return SOTA_Call_AddRaidDKP(arg);
-		else
-			localEcho("DKP должно быть в формате +999 или -999");
-			return;
+			if arg and arg ~= "" then
+				return SOTA_Call_AddRaidDKP(arg);
+			end
 		end
+		localEcho("DKP должно быть в формате +999 или -999");
+		return;
 	end
 
 	if cmd == "raidcheck" then
@@ -449,6 +513,7 @@ function SOTA_DisplayHelp()
 	--	Misc:
 	localEcho("Miscellaneous:");
 	echo("  Config    Open the SotA configuration screen.");
+	echo("  ResetConfig    Reset all settings to default values.");
 	echo("  Log    Open the SotA transaction log screen.");
 	echo("  Master    Request SotA master status.");
 	echo("  <item>    Start an auction for <item>.");
@@ -514,7 +579,14 @@ function SOTA_OpenAddRaidDKPDialog()
 				-- Используем простое начисление без имени босса
 				local dkpNum = tonumber(dkp);
 				if dkpNum then
-					SOTA_Call_AddRaidDKP(dkp .. " DKP");
+					if SOTA_IsInRaid(true) then
+						RaidState = RAID_STATE_ENABLED;
+						SOTA_RequestMaster();
+						SOTA_AddRaidDKP(dkp .. " DKP");
+						SOTA_RequestUpdateGuildRoster();
+					else
+						localEcho("Не в рейде!");
+					end
 				else
 					localEcho("Ошибка: введи число DKP");
 				end
@@ -619,8 +691,15 @@ function SOTA_OpenRaidBossDKPDialog()
 	-- АВТОНАЧИСЛЕНИЕ: Если в рейд-зоне и включена настройка EnableZoneCheck
 	if zoneDKPType ~= nil and SOTA_CONFIG_EnableZoneCheck == 1 and bossDkp > 0 and zoneInstanceName then
 		-- Автоматически начисляем без диалога!
-		SOTA_Call_AddRaidDKP(bossDkp .. " " .. zoneInstanceName);
-		localEcho(string.format("Автоначислено %d DKP за %s", bossDkp, zoneInstanceName));
+		if SOTA_IsInRaid(true) then
+			RaidState = RAID_STATE_ENABLED;
+			SOTA_RequestMaster();
+			SOTA_AddRaidDKP(bossDkp .. " " .. zoneInstanceName);
+			SOTA_RequestUpdateGuildRoster();
+			localEcho(string.format("Автоначислено %d DKP за %s", bossDkp, zoneInstanceName));
+		else
+			localEcho("Не в рейде!");
+		end
 		return;
 	end
 	
@@ -647,7 +726,14 @@ function SOTA_OpenRaidBossDKPDialog()
 			local c = getglobal(this:GetParent():GetName().."EditBox");
 			local input = c:GetText();
 			if input and input ~= "" then
-				SOTA_Call_AddRaidDKP(input);
+				if SOTA_IsInRaid(true) then
+					RaidState = RAID_STATE_ENABLED;
+					SOTA_RequestMaster();
+					SOTA_AddRaidDKP(input);
+					SOTA_RequestUpdateGuildRoster();
+				else
+					localEcho("Не в рейде!");
+				end
 			end
 		end
 	}
@@ -1053,9 +1139,25 @@ local function SOTA_HandleTXUpdate(message, sender)
 		return
 	end
 
-	local _, _, timestamp, tid, author, description, transstatus, name, dkp = string.find(message, "([^/]*)/([0-9]*)/([^/]*)/([^/]*)/([0-9]*)/([^/]*)/([^/]*)")
+	local result = { string.find(message, "([^/]*)/([0-9]*)/([^/]*)/([^/]*)/([0-9]*)/([^/]*)/([^/]*)") }
+	if not result or not result[1] then
+		-- Не удалось распарсить сообщение
+		return
+	end
+	
+	local timestamp = result[3];
+	local tid = result[4];
+	local author = result[5];
+	local description = result[6];
+	local transstatus = result[7];
+	local name = result[8];
+	local dkp = result[9];
 
 	tid = tonumber(tid);
+	if not tid then
+		-- Некорректный transaction ID
+		return
+	end
 
 
 	-- "Include" and "Exclude" does not have transactions, and should not be stored in the transaction log.
@@ -1074,11 +1176,23 @@ local function SOTA_HandleTXUpdate(message, sender)
 	
 	local transaction = SOTA_transactionLog[tid];
 	if not transaction then
+		-- Проверяем, что все обязательные поля присутствуют
+		if not timestamp or not author or not description or not transstatus then
+			return
+		end
 		transaction = { timestamp, tid, author, description, transstatus, { } };
 	end
 	
 	--	List of transaction lines contained in this transaction ("name=dkp" entries)
+	if not name or not dkp then
+		return
+	end
+	
 	local transactions = transaction[6];
+	if not transactions then
+		transactions = { };
+		transaction[6] = transactions;
+	end
 	transactions[table.getn(transactions) + 1] = { name, dkp }
 	transaction[6] = transactions;
 
@@ -1184,9 +1298,10 @@ function SOTA_HandleRXSyncInitDone()
 	local maxQueue = 0;
 	local maxSource = "";
 	for n=1, table.getn(syncRQResults), 1 do
-		if(tonumber(syncRQResults[n][2]) > maxQueue) then
-			maxQueue = syncRQResults[n][2];
-			maxSource = syncRQResults[n][1];
+		local result = syncRQResults[n];
+		if result and tonumber(result[2]) and tonumber(result[2]) > maxQueue then
+			maxQueue = tonumber(result[2]);
+			maxSource = result[1] or "";
 		end
 	end
 
@@ -1200,13 +1315,16 @@ end
 function SOTA_HandleTXSyncTransaction(message, sender)
 	--	Iterate over transactions
 	for n = 1, table.getn(SOTA_transactionLog), 1 do
-		local rec = SOTA_transactionLog[n]
-		local timestamp = rec[1]
-		local tid = rec[2]
-		local author = rec[3]
-		local desc = rec[4]
-		local state = rec[5]
-		local tidChanges = rec[6]
+		local rec = SOTA_transactionLog[n];
+		if not rec then
+			break;
+		end
+		local timestamp = rec[1];
+		local tid = rec[2];
+		local author = rec[3];
+		local desc = rec[4];
+		local state = rec[5];
+		local tidChanges = rec[6];
 
 		--	Iterate over transaction lines
 		for f = 1, table.getn(tidChanges), 1 do
@@ -1231,9 +1349,13 @@ function SOTA_HandleTXSyncRaidQueue(message, sender)
 
 	--{ Name, QueueID, Role , Class }
 	for n=1, table.getn(SOTA_RaidQueue), 1 do
-		local name = SOTA_RaidQueue[n][1];
-		local role = SOTA_RaidQueue[n][3];
-		local clss = SOTA_RaidQueue[n][4];
+		local queueEntry = SOTA_RaidQueue[n];
+		if not queueEntry then
+			break;
+		end
+		local name = queueEntry[1];
+		local role = queueEntry[3];
+		local clss = queueEntry[4];
 		
 		-- TODO:
 		--	OFFLINE state is not broadcasted. That is not a problem wince the
@@ -1269,11 +1391,18 @@ function SOTA_HandleRXSyncTransaction(message, sender)
 	end
 
 	local transactions = transaction[6];
+	if not transactions then
+		transactions = {};
+		transaction[6] = transactions;
+	end
 	local tracCount = table.getn(transactions);
 
 	--	Check if this transaction line does already exist in transaction
 	for f = 1, tracCount, 1 do
 		local trac = transactions[f];
+		if not trac then
+			break;
+		end
 		local currentName = trac[1];
 		local currentDkp = trac[2];
 
@@ -1422,10 +1551,16 @@ function SOTA_BroadcastTransaction(transaction)
 		local description = transaction[4];
 		local transstate = transaction[5];
 		local transactions = transaction[6];
+		if not transactions then
+			return;
+		end
 
 		local rec, name, dkp, payload;
 		for n = 1, table.getn(transactions), 1 do
 			rec = transactions[n];
+			if not rec then
+				break;
+			end
 			name = rec[1];
 			dkp = rec[2];
 			--	TID plus NAME combo is unique.
@@ -1591,6 +1726,11 @@ function SOTA_OnLoad()
 	SOTA_RefreshRaidRoster();
 	SOTA_InitializeUI();
 	SOTA_RefreshDKPNotesButton();  -- Инициализируем иконку при загрузке 
+	
+	-- Инициализируем сообщения при загрузке, чтобы они были доступны сразу
+	if SOTA_VerifyEventMessages then
+		SOTA_VerifyEventMessages();
+	end
 	
 	SOTA_RequestUpdateGuildRoster()
 	

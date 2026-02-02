@@ -105,7 +105,11 @@
 						<PushedTexture file="Interface\ICONS\INV_Misc_Gear_02.blp" />
 						<Scripts>
 							<OnClick>
-								SOTA_OpenConfigurationUI();
+								if SOTA_OpenConfigurationUI then
+									SOTA_OpenConfigurationUI();
+								else
+									localEcho("SOTA: Configuration UI not loaded yet. Please wait a moment and try again.");
+								end
 							</OnClick>
 							<OnEnter>
 								SOTA_ShowDashboardToolTip(this, "Open Configuration screen");

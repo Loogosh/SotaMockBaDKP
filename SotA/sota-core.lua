@@ -128,10 +128,89 @@ SOTA_CONFIG_EnableOnlineCheck	= 1;	-- Enable online check when doing raid queue 
 SOTA_CONFIG_AllowPlayerPass     = 1;	-- 0: No pass, 1: can pass latest bid
 SOTA_CONFIG_DisableDashboard	= 0;	-- Disable Dashboard in UI (hide it)
 SOTA_CONFIG_OutputChannel		= WARN_CHANNEL;
-SOTA_CONFIG_Messages			= { }	-- Contains configurable raid messages (if any)
-SOTA_CONFIG_VersionNumber		= nil;	-- Increases for every change!
-SOTA_CONFIG_VersionDate			= nil;	-- Date of last change!
+SOTA_CONFIG_Messages			= nil;	-- Contains configurable raid messages (if any) - будет инициализировано в SOTA_VerifyEventMessages()
+	SOTA_CONFIG_VersionNumber		= nil;	-- Increases for every change!
+	SOTA_CONFIG_VersionDate			= nil;	-- Date of last change!
 -- SOTA_CONFIG_MinBid				= 100;
+
+--[[
+--	Verify event messages - full version moved here to ensure early availability
+--	This will be overridden by sota-options.lua if it loads later
+--]]
+function SOTA_VerifyEventMessages()
+	-- Syntax: [index] = { EVENT_NAME, CHANNEL, TEXT }
+	-- Channel value: 0: Off, 1: RW, 2: Raid, 3: Guild, 4: Yell, 5: Say
+	local defaultMessages = { 
+		{ SOTA_MSG_OnOpen					, 1, "Начинается аукцион на $i. Минимальная ставка: $d ДКП." },
+		{ SOTA_MSG_OnAnnounceBid			, 2, "Для совершения ставки по МС напишите /w $s bid <ваша ставка>" },
+		{ SOTA_MSG_OnAnnounceMinBid			, 2, "Для совершения ставки по ОС напишите /w $s os <ваша ставка>" },
+		{ SOTA_MSG_ExtraInfo				, 2, "Если есть ставка на МС, ставка на ОС не будет принята. Шаг ставки 100 ДКП" },
+		{ SOTA_MSG_On10SecondsLeft			, 0, "Осталось 10 секунд для ставок на $i" },
+		{ SOTA_MSG_On9SecondsLeft			, 0, "9" },
+		{ SOTA_MSG_On8SecondsLeft			, 0, "8" },
+		{ SOTA_MSG_On7SecondsLeft			, 0, "7" },
+		{ SOTA_MSG_On6SecondsLeft			, 0, "6" },
+		{ SOTA_MSG_On5SecondsLeft			, 0, "5" },
+		{ SOTA_MSG_On4SecondsLeft			, 0, "4" },
+		{ SOTA_MSG_On3SecondsLeft			, 0, "3" },
+		{ SOTA_MSG_On2SecondsLeft			, 0, "2" },
+		{ SOTA_MSG_On1SecondLeft			, 0, "1" },
+		{ SOTA_MSG_OnMainspecBid			, 1, "$b поставил $d ДКП" },
+		{ SOTA_MSG_OnOffspecBid				, 1, "$b поставил $d ДКП на офф-спек" },
+		{ SOTA_MSG_OnMainspecMaxBid			, 1, "$b поставил $d ДКП на $i! Квартира залита!" },
+		{ SOTA_MSG_OnOffspecMaxBid			, 1, "$b поставил $d ДКП на $i по офф-спеку! Квартира залита!" },
+		{ SOTA_MSG_OnComplete				, 2, "$b выиграл аукцион на $i за $d ДКП. Легенда!" },
+		{ SOTA_MSG_OnPause					, 2, "Аукцион на $i приостановлен" },
+		{ SOTA_MSG_OnResume					, 2, "Аукцион на $i возобновлен" },
+		{ SOTA_MSG_OnClose					, 1, "Аукцион на $i завершен" },
+		{ SOTA_MSG_OnBidCancel				, 1, "Ставка $b была отменена, наивысшая ставка теперь $m" },
+		{ SOTA_MSG_OnCancel					, 1, "Аукцион на $i был отменен" },
+		{ SOTA_MSG_OnDKPAdded				, 1, "$d ДКП было добавлено $b" },
+		{ SOTA_MSG_OnDKPAddedRaid			, 1, "$d ДКП было добавлено всем участникам рейда за убийство $1" },
+		{ SOTA_MSG_OnDKPAddedRaidAttendance	, 1, "$d ДКП было добавлено всем участникам рейда за приход в $1. ГОЙДА!" },
+		{ SOTA_MSG_OnDKPAddedRaidNoWipes	, 1, "$d ДКП было добавлено всем участникам рейда за завершение рейда без вайпов. Лучшие" },
+		{ SOTA_MSG_OnDKPAddedRange			, 1, "$d ДКП было добавлено $1 игрокам в радиусе." },
+		{ SOTA_MSG_OnDKPAddedQueue			, 1, "$d ДКП было добавлено $1 игрокам в радиусе (включая $2 в очереди)." },
+		{ SOTA_MSG_OnDKPSubtract			, 1, "$d ДКП было снято с $b" },
+		{ SOTA_MSG_OnDKPSubtractRaid		, 1, "$d ДКП было снято всем участникам рейда" },
+		{ SOTA_MSG_OnDKPPercent				, 1, "$1 % ($d ДКП) было снято с $b" },
+		{ SOTA_MSG_OnDKPShared				, 1, "$1 ДКП было распределено ($d ДКП на игрока)" },
+		{ SOTA_MSG_OnDKPSharedQueue 		, 1, "$1 ДКП было распределено ($d ДКП на игрока плюс $2 в очереди)" },
+		{ SOTA_MSG_OnDKPSharedRange 		, 1, "$1 ДКП было распределено между $2 игроками в радиусе ($d ДКП на игрока)" },
+		{ SOTA_MSG_OnDKPSharedRangeQ		, 1, "$1 ДКП было распределено между $2 игроками в радиусе ($d ДКП на игрока, включая $3 в очереди)" },
+		{ SOTA_MSG_OnDKPReplaced			, 1, "$1 был заменен на $2 ($d ДКП)" }
+	}
+
+	-- Merge default messages into saved messages; in case we added some new event names.
+	local messages = SOTA_GetConfigurableTextMessages();
+	-- Если messages nil или пустая таблица - устанавливаем дефолтные значения
+	if not messages or table.getn(messages) == 0 then
+		-- Клонируем дефолтные сообщения
+		local clonedMessages = { };
+		for n=1, table.getn(defaultMessages), 1 do
+			clonedMessages[n] = { defaultMessages[n][1], defaultMessages[n][2], defaultMessages[n][3] };
+		end
+		SOTA_SetConfigurableTextMessages(clonedMessages);
+		return;
+	end;
+
+	-- Merge: добавляем новые сообщения, если они появились
+	for n=1,table.getn(defaultMessages), 1 do
+		local foundMessage = false;
+		for f=1,table.getn(messages), 1 do
+			if(messages[f][1] == defaultMessages[n][1]) then
+				foundMessage = true;
+				break;
+			end;
+		end;
+
+		if(not foundMessage) then
+			messages[table.getn(messages)+1] = defaultMessages[n];
+		end;
+	end
+
+	SOTA_SetConfigurableTextMessages(messages);
+end
 -- SOTA_CONFIG_Step				= 100;
 
 
@@ -191,6 +270,45 @@ function debugEcho(msg)
 		DEFAULT_CHAT_FRAME:AddMessage(SOTA_COLOUR_CHAT .. "DEBUG: ".. msg .. SOTA_CHAT_END)
 	end
 end
+
+--[[
+--	Echo event message (wrapper for configurable messages)
+--]]
+function SOTA_EchoEvent(msgKey, item, dkp, bidder, rank, param1, param2, param3)
+	-- Пытаемся инициализировать сообщения, если они не инициализированы
+	if not SOTA_CONFIG_Messages or (type(SOTA_CONFIG_Messages) == "table" and table.getn(SOTA_CONFIG_Messages) == 0) then
+		if SOTA_VerifyEventMessages then
+			SOTA_VerifyEventMessages();
+		end
+	end
+	
+	if SOTA_getConfigurableMessage then
+		local msgInfo = SOTA_getConfigurableMessage(msgKey, item, dkp, bidder, rank, param1, param2, param3);
+		if msgInfo then
+			publicEcho(msgInfo);
+		end
+	else
+		-- Fallback if options not loaded yet - пытаемся инициализировать еще раз
+		if SOTA_VerifyEventMessages then
+			SOTA_VerifyEventMessages();
+			-- Пытаемся еще раз после инициализации
+			if SOTA_getConfigurableMessage then
+				local msgInfo = SOTA_getConfigurableMessage(msgKey, item, dkp, bidder, rank, param1, param2, param3);
+				if msgInfo then
+					publicEcho(msgInfo);
+					return;
+				end
+			end
+		end
+		-- Если все еще не работает, выводим ошибку
+		localEcho("SOTA: Message system not initialized");
+	end
+end
+
+--[[
+--	Open Configuration UI - defined in sota-options.lua
+--	No stub here - function must be checked before calling
+--]]
 
 function publicEcho(msgInfo)
 
@@ -425,17 +543,23 @@ function SOTA_OnGuildRosterUpdate()
 		if not JobIsRunning then	
 			JobIsRunning = true
 			
-			local job = SOTA_GetNextJob()
-			while job do
-				job[1](job)				
-				job = SOTA_GetNextJob()
-			end
+			local success, err = pcall(function()
+				local job = SOTA_GetNextJob()
+				while job do
+					job[1](job)				
+					job = SOTA_GetNextJob()
+				end
+				
+				if SOTA_IsInRaid(true) then
+					SOTA_RefreshRaidRoster()
+				end
+			end)
 			
-			if SOTA_IsInRaid(true) then
-				SOTA_RefreshRaidRoster()
-			end
- 
 			JobIsRunning = false
+			
+			if not success then
+				localEcho("Ошибка при обработке DKP заданий: " .. tostring(err));
+			end
 		end
 	end
 	
@@ -481,8 +605,10 @@ function SOTA_RefreshGuildRoster()
 		end
 		
 		local _, _, dkp = string.find(note, "<(-?%d*)>")
-		if not dkp or not tonumber(dkp) then
+		if not dkp or tonumber(dkp) == nil then
 			dkp = 0;
+		else
+			dkp = tonumber(dkp);
 		end
 		
 		--echo(string.format("Added %s (%s)", name, online));
@@ -503,10 +629,14 @@ end
 --	Returns NIL if player was not found.
 --]]
 function SOTA_GetGuildPlayerInfo(player)
+	if not player then
+		return nil;
+	end
+	
 	player = SOTA_UCFirst(player);
 
 	for n=1, table.getn(GuildRosterTable), 1 do
-		if GuildRosterTable[n][1] == player then
+		if GuildRosterTable[n] and GuildRosterTable[n][1] == player then
 			return GuildRosterTable[n];
 		end
 	end
@@ -572,13 +702,13 @@ function SOTA_RefreshRaidRoster()
 		for n=1,playerCount,1 do
 			local name, _, _, _, class = GetRaidRosterInfo(n);
 
-			for m=1,memberCount,1 do
-				local info = GuildRosterTable[m]
-				if name == info[1] then
-					RaidRosterTable[index] = info;
-					index = index + 1
-				end
+		for m=1,memberCount,1 do
+			local info = GuildRosterTable[m];
+			if info and name == info[1] then
+				RaidRosterTable[index] = info;
+				index = index + 1
 			end
+		end
 		end
 	end
 	
@@ -621,14 +751,28 @@ end
 
 function SOTA_GetBossDKPList()
 	if not SOTA_CONFIG_BossDKP or table.getn(SOTA_CONFIG_BossDKP) == 0 then
-		SOTA_CONFIG_BossDKP = SOTA_CONFIG_DEFAULT_BossDKP;
+		-- Клонируем дефолтные значения, чтобы не изменять исходную таблицу
+		SOTA_CONFIG_BossDKP = {};
+		for n=1, table.getn(SOTA_CONFIG_DEFAULT_BossDKP), 1 do
+			SOTA_CONFIG_BossDKP[n] = { SOTA_CONFIG_DEFAULT_BossDKP[n][1], SOTA_CONFIG_DEFAULT_BossDKP[n][2] };
+		end
 	end
 	return SOTA_CONFIG_BossDKP;
 end
 
 function SOTA_GetItemDKPList()
 	if not SOTA_CONFIG_ItemDKP or table.getn(SOTA_CONFIG_ItemDKP) == 0 then
-		SOTA_CONFIG_ItemDKP = SOTA_CONFIG_DEFAULT_ItemDKP;
+		-- Клонируем дефолтные значения, чтобы не изменять исходную таблицу
+		SOTA_CONFIG_ItemDKP = {};
+		for n=1, table.getn(SOTA_CONFIG_DEFAULT_ItemDKP), 1 do
+			SOTA_CONFIG_ItemDKP[n] = {
+				SOTA_CONFIG_DEFAULT_ItemDKP[n][1],
+				SOTA_CONFIG_DEFAULT_ItemDKP[n][2],
+				SOTA_CONFIG_DEFAULT_ItemDKP[n][3],
+				SOTA_CONFIG_DEFAULT_ItemDKP[n][4],
+				SOTA_CONFIG_DEFAULT_ItemDKP[n][5]
+			};
+		end
 	end
 	return SOTA_CONFIG_ItemDKP;
 end
@@ -791,13 +935,17 @@ function SOTA_SwapPlayersInTransaction(transactionID, newPlayer, silentmode)
 		return;
 	end
 	
-	if not table.getn(transaction[6]) == 1 then
+	if not transaction[6] or table.getn(transaction[6]) ~= 1 then
 		-- Not a single-player transaction!
 		return;	
 	end
 	
+	if not transaction[6][1] then
+		return;
+	end
+	
 	local originalPlayer = transaction[6][1][1];
-	local dkpValue = 1 * (transaction[6][1][2]);
+	local dkpValue = 1 * (transaction[6][1][2] or 0);
 
 	if SOTA_ApplyPlayerDKP(newPlayer, dkpValue) then
 		newPlayer = SOTA_UCFirst(newPlayer);
@@ -817,10 +965,15 @@ end
 --	Subtract <dkp> DKP from <playername>
 --]]
 function SOTA_Call_SubtractPlayerDKP(playername, dkp)
-	if SOTA_CanDoDKP() and tonumber(dkp) then
+	if not playername or not dkp then
+		return;
+	end
+	
+	local dkpNum = tonumber(dkp);
+	if SOTA_CanDoDKP() and dkpNum ~= nil then
 		RaidState = RAID_STATE_ENABLED;
 		SOTA_RequestMaster();
-		SOTA_AddJob( function(job) SOTA_SubtractPlayerDKP(job[2], job[3]) end, playername, dkp )
+		SOTA_AddJob( function(job) SOTA_SubtractPlayerDKP(job[2], job[3]) end, playername, dkpNum )
 		SOTA_RequestUpdateGuildRoster();
 	end
 end
@@ -912,17 +1065,25 @@ function SOTA_AddRaidDKP(arg, silentmode, callMethod)
 		local tidIndex = 1
 		local tidChanges = { }
 
+		local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
 		local raidRoster = SOTA_GetRaidRoster();
 		for n=1, table.getn(raidRoster), 1 do
-			SOTA_ApplyPlayerDKP(raidRoster[n][1], dkp);
-			
-			tidChanges[tidIndex] = { raidRoster[n][1], dkp };
-			tidIndex = tidIndex + 1;
+			local playerInfo = raidRoster[n];
+			if playerInfo then
+				-- Проверяем онлайн/офлайн для рейда, если включена проверка
+				if onlinecheck == 1 and playerInfo[5] == 0 then
+					-- Игрок офлайн, пропускаем
+					localEcho(string.format("Пропущен %s (офлайн)", playerInfo[1]));
+				else
+					SOTA_ApplyPlayerDKP(playerInfo[1], dkp);
+					tidChanges[tidIndex] = { playerInfo[1], dkp };
+					tidIndex = tidIndex + 1;
+				end
+			end
 		end
 		
 		local instance, zonename;
 		local zonecheck = SOTA_CONFIG_EnableZoneCheck;
-		local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
 		if zonecheck == 1 then
 			instance, zonename = SOTA_GetValidDKPZones();
 			if not instance then
@@ -931,28 +1092,33 @@ function SOTA_AddRaidDKP(arg, silentmode, callMethod)
 		end
 		
 		for n=1, table.getn(SOTA_RaidQueue), 1 do
-			local guildInfo = SOTA_GetGuildPlayerInfo(SOTA_RaidQueue[n][1]);
+			local queueEntry = SOTA_RaidQueue[n];
+			if not queueEntry then
+				break;
+			end
+			
+			local guildInfo = SOTA_GetGuildPlayerInfo(queueEntry[1]);
 
 			if guildInfo then
 				local eligibleForDKP = true;
-	
+
 				-- Player is OFFLINE, skip if not allowed
 				if guildInfo[5] == 0 and onlinecheck == 1 then
-					localEcho(string.format("No queue DKP for %s (Offline)", SOTA_RaidQueue[n][1]));
+					localEcho(string.format("No queue DKP for %s (Offline)", queueEntry[1]));
 					eligibleForDKP = false;
 				end
 				
 				-- Player is not in raid zone
 				if eligibleForDKP and guildInfo[5] == 1 and zonecheck == 1 then
 						if not(guildInfo[6] == instance or guildInfo[6] == zonename) then
-							localEcho(string.format("No queue DKP for %s (location: %s)", SOTA_RaidQueue[n][1], guildInfo[6]));
+							localEcho(string.format("No queue DKP for %s (location: %s)", queueEntry[1], guildInfo[6]));
 							eligibleForDKP = false;
 						end;
 				end;
-								
+							
 				if eligibleForDKP then				   
-					SOTA_ApplyPlayerDKP(SOTA_RaidQueue[n][1], dkp);				
-					tidChanges[tidIndex] = { SOTA_RaidQueue[n][1], dkp };
+					SOTA_ApplyPlayerDKP(queueEntry[1], dkp);
+					tidChanges[tidIndex] = { queueEntry[1], dkp };
 					tidIndex = tidIndex + 1;
 					SOTA_QueuedPlayersImpacteded = SOTA_QueuedPlayersImpacteded + 1;
 				end
@@ -995,17 +1161,25 @@ function SOTA_AddRaidDKPAttendance(arg, silentmode, callMethod)
 		local tidIndex = 1
 		local tidChanges = { }
 
+		local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
 		local raidRoster = SOTA_GetRaidRoster();
 		for n=1, table.getn(raidRoster), 1 do
-			SOTA_ApplyPlayerDKP(raidRoster[n][1], dkp);
-			
-			tidChanges[tidIndex] = { raidRoster[n][1], dkp };
-			tidIndex = tidIndex + 1;
+			local playerInfo = raidRoster[n];
+			if playerInfo then
+				-- Проверяем онлайн/офлайн для рейда, если включена проверка
+				if onlinecheck == 1 and playerInfo[5] == 0 then
+					-- Игрок офлайн, пропускаем
+					localEcho(string.format("Пропущен %s (офлайн)", playerInfo[1]));
+				else
+					SOTA_ApplyPlayerDKP(playerInfo[1], dkp);
+					tidChanges[tidIndex] = { playerInfo[1], dkp };
+					tidIndex = tidIndex + 1;
+				end
+			end
 		end
 		
 		local instance, zonename;
 		local zonecheck = SOTA_CONFIG_EnableZoneCheck;
-		local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
 		if zonecheck == 1 then
 			instance, zonename = SOTA_GetValidDKPZones();
 			if not instance then
@@ -1014,28 +1188,33 @@ function SOTA_AddRaidDKPAttendance(arg, silentmode, callMethod)
 		end
 		
 		for n=1, table.getn(SOTA_RaidQueue), 1 do
-			local guildInfo = SOTA_GetGuildPlayerInfo(SOTA_RaidQueue[n][1]);
+			local queueEntry = SOTA_RaidQueue[n];
+			if not queueEntry then
+				break;
+			end
+			
+			local guildInfo = SOTA_GetGuildPlayerInfo(queueEntry[1]);
 
 			if guildInfo then
 				local eligibleForDKP = true;
 	
 				-- Player is OFFLINE, skip if not allowed
 				if guildInfo[5] == 0 and onlinecheck == 1 then
-					localEcho(string.format("No queue DKP for %s (Offline)", SOTA_RaidQueue[n][1]));
+					localEcho(string.format("No queue DKP for %s (Offline)", queueEntry[1]));
 					eligibleForDKP = false;
 				end
 				
 				-- Player is not in raid zone
 				if eligibleForDKP and guildInfo[5] == 1 and zonecheck == 1 then
 						if not(guildInfo[6] == instance or guildInfo[6] == zonename) then
-							localEcho(string.format("No queue DKP for %s (location: %s)", SOTA_RaidQueue[n][1], guildInfo[6]));
+							localEcho(string.format("No queue DKP for %s (location: %s)", queueEntry[1], guildInfo[6]));
 							eligibleForDKP = false;
 						end;
 				end;
 								
 				if eligibleForDKP then				   
-					SOTA_ApplyPlayerDKP(SOTA_RaidQueue[n][1], dkp);				
-					tidChanges[tidIndex] = { SOTA_RaidQueue[n][1], dkp };
+					SOTA_ApplyPlayerDKP(queueEntry[1], dkp);
+					tidChanges[tidIndex] = { queueEntry[1], dkp };
 					tidIndex = tidIndex + 1;
 					SOTA_QueuedPlayersImpacteded = SOTA_QueuedPlayersImpacteded + 1;
 				end
@@ -1078,17 +1257,25 @@ function SOTA_AddRaidDKPNoWipes(dkp, silentmode, callMethod)
 		local tidIndex = 1
 		local tidChanges = { }
 
+		local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
 		local raidRoster = SOTA_GetRaidRoster();
 		for n=1, table.getn(raidRoster), 1 do
-			SOTA_ApplyPlayerDKP(raidRoster[n][1], dkp);
-			
-			tidChanges[tidIndex] = { raidRoster[n][1], dkp };
-			tidIndex = tidIndex + 1;
+			local playerInfo = raidRoster[n];
+			if playerInfo then
+				-- Проверяем онлайн/офлайн для рейда, если включена проверка
+				if onlinecheck == 1 and playerInfo[5] == 0 then
+					-- Игрок офлайн, пропускаем
+					localEcho(string.format("Пропущен %s (офлайн)", playerInfo[1]));
+				else
+					SOTA_ApplyPlayerDKP(playerInfo[1], dkp);
+					tidChanges[tidIndex] = { playerInfo[1], dkp };
+					tidIndex = tidIndex + 1;
+				end
+			end
 		end
 		
 		local instance, zonename;
 		local zonecheck = SOTA_CONFIG_EnableZoneCheck;
-		local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
 		if zonecheck == 1 then
 			instance, zonename = SOTA_GetValidDKPZones();
 			if not instance then
@@ -1104,21 +1291,21 @@ function SOTA_AddRaidDKPNoWipes(dkp, silentmode, callMethod)
 	
 				-- Player is OFFLINE, skip if not allowed
 				if guildInfo[5] == 0 and onlinecheck == 1 then
-					localEcho(string.format("No queue DKP for %s (Offline)", SOTA_RaidQueue[n][1]));
+					localEcho(string.format("No queue DKP for %s (Offline)", queueEntry[1]));
 					eligibleForDKP = false;
 				end
 				
 				-- Player is not in raid zone
 				if eligibleForDKP and guildInfo[5] == 1 and zonecheck == 1 then
 						if not(guildInfo[6] == instance or guildInfo[6] == zonename) then
-							localEcho(string.format("No queue DKP for %s (location: %s)", SOTA_RaidQueue[n][1], guildInfo[6]));
+							localEcho(string.format("No queue DKP for %s (location: %s)", queueEntry[1], guildInfo[6]));
 							eligibleForDKP = false;
 						end;
 				end;
 								
 				if eligibleForDKP then				   
-					SOTA_ApplyPlayerDKP(SOTA_RaidQueue[n][1], dkp);				
-					tidChanges[tidIndex] = { SOTA_RaidQueue[n][1], dkp };
+					SOTA_ApplyPlayerDKP(queueEntry[1], dkp);
+					tidChanges[tidIndex] = { queueEntry[1], dkp };
 					tidIndex = tidIndex + 1;
 					SOTA_QueuedPlayersImpacteded = SOTA_QueuedPlayersImpacteded + 1;
 				end
@@ -1392,15 +1579,19 @@ function SOTA_Call_Decaytest(percent)
 	SOTA_RequestUpdateGuildRoster();
 end
 function SOTA_Decaytest(percent, silentmode)
+	if not percent then
+		return false;
+	end
+	
 	--	Note: arg may contain a percent sign; remove this first:
-	if not tonumber(percent) then
+	if tonumber(percent) == nil then
 		local pctSign = string.sub(percent, string.len(percent), string.len(percent));
 		if pctSign == "%" then
 			percent = string.sub(percent, 1, string.len(percent) - 1);
 		end
 	end
 	
-	if not tonumber(percent) then
+	if tonumber(percent) == nil then
 		localEcho("Guild Decay test cancelled: Percent is not a valid number: ".. percent);
 		return false;
 	end
@@ -1424,7 +1615,7 @@ function SOTA_Decaytest(percent, silentmode)
 		end
 
 		local _, _, dkp = string.find(note, "<(-?%d*)>");
-		if dkp and tonumber(dkp) then
+		if dkp and tonumber(dkp) ~= nil then
 			local minus = floor(dkp * percent / 100)
 			tidChanges[tidIndex] = { name, (-1 * minus) }
 			tidIndex = tidIndex + 1
@@ -1455,15 +1646,19 @@ function SOTA_Call_DecayDKP(percent)
 	SOTA_RequestUpdateGuildRoster();
 end
 function SOTA_DecayDKP(percent, silentmode)
+	if not percent then
+		return false;
+	end
+	
 	--	Note: arg may contain a percent sign; remove this first:
-	if not tonumber(percent) then
+	if tonumber(percent) == nil then
 		local pctSign = string.sub(percent, string.len(percent), string.len(percent));
 		if pctSign == "%" then
 			percent = string.sub(percent, 1, string.len(percent) - 1);
 		end
 	end
 	
-	if not tonumber(percent) then
+	if tonumber(percent) == nil then
 		if not silentmode then
 			localEcho("Guild Decay cancelled: Percent is not a valid number: ".. percent);
 		end
@@ -1498,7 +1693,7 @@ function SOTA_DecayDKP(percent, silentmode)
 		end
 
 		local _, _, dkp = string.find(note, "<(-?%d*)>");
-		if dkp and tonumber(dkp) then
+		if dkp and tonumber(dkp) ~= nil then
 			local minus = floor(dkp * percent / 100)
 			tidChanges[tidIndex] = { name, (-1 * minus) }
 			tidIndex = tidIndex + 1
@@ -1740,10 +1935,16 @@ end
 function SOTA_CreateDkpString(dkp)
 	local result;
 	
-	if not dkp or dkp == "" or not tonumber(dkp) then
+	if not dkp or dkp == "" then
 		dkp = 0;
+	else
+		local dkpNum = tonumber(dkp);
+		if dkpNum == nil then
+			dkp = 0;
+		else
+			dkp = dkpNum;
+		end
 	end
-	dkp = tonumber(dkp);
 	
 	local dkpLen = tonumber(SOTA_CONFIG_DKPStringLength);
 	if dkpLen > 0 then
@@ -1903,7 +2104,7 @@ function SOTA_GetStartingDKP()
 		startingDKP = SOTA_GetBossDKPValue("AQ40") / 10;
 	elseif zonetext == "Naxxramas" then
 		startingDKP = SOTA_GetBossDKPValue("Naxxramas") / 10;
-	elseif zonetext == "Karazhan" then
+	elseif zonetext == "Tower of Karazhan" or zonetext == "The Rock of Desolation" then
 		startingDKP = SOTA_GetBossDKPValue("UpperKarazhan") / 10;
 	elseif zonetext == "Feralas" or zonetext == "Ashenvale" or zonetext == "Azshara" or 
 		zonetext == "Duskwood" or zonetext == "Blasted Lands" or zonetext == "The Hinterlands" then
@@ -1938,7 +2139,7 @@ function SOTA_GetValidDKPZones()
 		validZones = { zonetext, "Gates of Ahn'Qiraj" };
 	elseif zonetext == "Naxxramas" then 
 		validZones = { zonetext, "Eastern Plaguelands" };
-	elseif zonetext == "Karazhan" then 
+	elseif zonetext == "Tower of Karazhan" or zonetext == "The Rock of Desolation" then 
 		validZones = { zonetext, "Deadwind Pass" };
 	elseif zonetext == "Feralas" or zonetext == "Ashenvale" or zonetext == "Azshara" or 
 		zonetext == "Duskwood" or zonetext == "Blasted Lands" or zonetext == "The Hinterlands" then
@@ -1996,3 +2197,70 @@ end;
 function SOTA_SetConfigurableTextMessages(messages)
 	SOTA_CONFIG_Messages = messages;
 end;
+
+--[[
+--	Reset all settings to default values
+--]]
+function SOTA_ResetAllSettingsToDefault()
+	-- Pane 1: Основные настройки
+	SOTA_CONFIG_AuctionTime = 20;
+	SOTA_CONFIG_AuctionExtension = 8;
+	SOTA_CONFIG_EnableOSBidding = 1;
+	SOTA_CONFIG_EnableZoneCheck = 1;
+	SOTA_CONFIG_EnableOnlineCheck = 1;
+	SOTA_CONFIG_AllowPlayerPass = 1;
+	SOTA_CONFIG_DisableDashboard = 0;
+	SOTA_CONFIG_OutputChannel = WARN_CHANNEL;
+	
+	-- Pane 2: Boss DKP - клонируем дефолтные значения
+	SOTA_CONFIG_BossDKP = {};
+	for n=1, table.getn(SOTA_CONFIG_DEFAULT_BossDKP), 1 do
+		SOTA_CONFIG_BossDKP[n] = { SOTA_CONFIG_DEFAULT_BossDKP[n][1], SOTA_CONFIG_DEFAULT_BossDKP[n][2] };
+	end
+	
+	-- Pane 2.5: Item DKP - клонируем дефолтные значения
+	SOTA_CONFIG_ItemDKP = {};
+	for n=1, table.getn(SOTA_CONFIG_DEFAULT_ItemDKP), 1 do
+		SOTA_CONFIG_ItemDKP[n] = {
+			SOTA_CONFIG_DEFAULT_ItemDKP[n][1],
+			SOTA_CONFIG_DEFAULT_ItemDKP[n][2],
+			SOTA_CONFIG_DEFAULT_ItemDKP[n][3],
+			SOTA_CONFIG_DEFAULT_ItemDKP[n][4],
+			SOTA_CONFIG_DEFAULT_ItemDKP[n][5]
+		};
+	end
+	
+	-- Pane 3: Misc DKP
+	SOTA_CONFIG_UseGuildNotes = 0;
+	SOTA_CONFIG_MinimumBidStrategy = 1;
+	SOTA_CONFIG_DKPStringLength = 5;
+	SOTA_CONFIG_MinimumDKPPenalty = 50;
+	
+	-- Pane 4: Messages - сбрасываем в nil, чтобы при следующей загрузке применились дефолты
+	SOTA_CONFIG_Messages = nil;
+	
+	-- History
+	SOTA_HISTORY_DKP = {};
+	
+	-- Версия и дата
+	SOTA_CONFIG_VersionNumber = nil;
+	SOTA_CONFIG_VersionDate = nil;
+	
+	localEcho("Все настройки сброшены к дефолтным значениям!");
+	
+	-- Инициализируем сообщения с дефолтными значениями
+	SOTA_VerifyEventMessages();
+	
+	-- Обновляем UI, если окно настроек открыто
+	-- Проверяем через функцию из sota-options.lua, так как ConfigurationDialogOpen определен там
+	if SOTA_IsConfigurationDialogOpen and SOTA_IsConfigurationDialogOpen() then
+		SOTA_InitializeConfigSettings();
+	end
+end;
+
+-- Инициализация сообщений при загрузке sota-core.lua
+-- Если sota-options.lua уже загружен, его версия SOTA_VerifyEventMessages будет вызвана
+-- Если нет, то заглушка просто создаст пустую таблицу
+if not SOTA_CONFIG_Messages or (type(SOTA_CONFIG_Messages) == "table" and table.getn(SOTA_CONFIG_Messages) == 0) then
+	SOTA_VerifyEventMessages();
+end
