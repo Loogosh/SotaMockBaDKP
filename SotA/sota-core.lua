@@ -134,83 +134,8 @@ SOTA_CONFIG_Messages			= nil;	-- Contains configurable raid messages (if any) - 
 -- SOTA_CONFIG_MinBid				= 100;
 
 --[[
---	Verify event messages - full version moved here to ensure early availability
---	This will be overridden by sota-options.lua if it loads later
+--	Verify event messages -Эта функция была перемещена в sota-options.lua
 --]]
-function SOTA_VerifyEventMessages()
-	-- Syntax: [index] = { EVENT_NAME, CHANNEL, TEXT }
-	-- Channel value: 0: Off, 1: RW, 2: Raid, 3: Guild, 4: Yell, 5: Say
-	local defaultMessages = { 
-		{ SOTA_MSG_OnOpen					, 1, "Начинается аукцион на $i. Минимальная ставка: $d ДКП." },
-		{ SOTA_MSG_OnAnnounceBid			, 2, "Для совершения ставки по МС напишите /w $s bid <ваша ставка>" },
-		{ SOTA_MSG_OnAnnounceMinBid			, 2, "Для совершения ставки по ОС напишите /w $s os <ваша ставка>" },
-		{ SOTA_MSG_ExtraInfo				, 2, "Если есть ставка на МС, ставка на ОС не будет принята. Шаг ставки 100 ДКП" },
-		{ SOTA_MSG_On10SecondsLeft			, 0, "Осталось 10 секунд для ставок на $i" },
-		{ SOTA_MSG_On9SecondsLeft			, 0, "9" },
-		{ SOTA_MSG_On8SecondsLeft			, 0, "8" },
-		{ SOTA_MSG_On7SecondsLeft			, 0, "7" },
-		{ SOTA_MSG_On6SecondsLeft			, 0, "6" },
-		{ SOTA_MSG_On5SecondsLeft			, 0, "5" },
-		{ SOTA_MSG_On4SecondsLeft			, 0, "4" },
-		{ SOTA_MSG_On3SecondsLeft			, 0, "3" },
-		{ SOTA_MSG_On2SecondsLeft			, 0, "2" },
-		{ SOTA_MSG_On1SecondLeft			, 0, "1" },
-		{ SOTA_MSG_OnMainspecBid			, 1, "$b поставил $d ДКП" },
-		{ SOTA_MSG_OnOffspecBid				, 1, "$b поставил $d ДКП на офф-спек" },
-		{ SOTA_MSG_OnMainspecMaxBid			, 1, "$b поставил $d ДКП на $i! Квартира залита!" },
-		{ SOTA_MSG_OnOffspecMaxBid			, 1, "$b поставил $d ДКП на $i по офф-спеку! Квартира залита!" },
-		{ SOTA_MSG_OnComplete				, 2, "$b выиграл аукцион на $i за $d ДКП. Легенда!" },
-		{ SOTA_MSG_OnPause					, 2, "Аукцион на $i приостановлен" },
-		{ SOTA_MSG_OnResume					, 2, "Аукцион на $i возобновлен" },
-		{ SOTA_MSG_OnClose					, 1, "Аукцион на $i завершен" },
-		{ SOTA_MSG_OnBidCancel				, 1, "Ставка $b была отменена, наивысшая ставка теперь $m" },
-		{ SOTA_MSG_OnCancel					, 1, "Аукцион на $i был отменен" },
-		{ SOTA_MSG_OnDKPAdded				, 1, "$d ДКП было добавлено $b" },
-		{ SOTA_MSG_OnDKPAddedRaid			, 1, "$d ДКП было добавлено всем участникам рейда за убийство $1" },
-		{ SOTA_MSG_OnDKPAddedRaidAttendance	, 1, "$d ДКП было добавлено всем участникам рейда за приход в $1. ГОЙДА!" },
-		{ SOTA_MSG_OnDKPAddedRaidNoWipes	, 1, "$d ДКП было добавлено всем участникам рейда за завершение рейда без вайпов. Лучшие" },
-		{ SOTA_MSG_OnDKPAddedRange			, 1, "$d ДКП было добавлено $1 игрокам в радиусе." },
-		{ SOTA_MSG_OnDKPAddedQueue			, 1, "$d ДКП было добавлено $1 игрокам в радиусе (включая $2 в очереди)." },
-		{ SOTA_MSG_OnDKPSubtract			, 1, "$d ДКП было снято с $b" },
-		{ SOTA_MSG_OnDKPSubtractRaid		, 1, "$d ДКП было снято всем участникам рейда" },
-		{ SOTA_MSG_OnDKPPercent				, 1, "$1 % ($d ДКП) было снято с $b" },
-		{ SOTA_MSG_OnDKPShared				, 1, "$1 ДКП было распределено ($d ДКП на игрока)" },
-		{ SOTA_MSG_OnDKPSharedQueue 		, 1, "$1 ДКП было распределено ($d ДКП на игрока плюс $2 в очереди)" },
-		{ SOTA_MSG_OnDKPSharedRange 		, 1, "$1 ДКП было распределено между $2 игроками в радиусе ($d ДКП на игрока)" },
-		{ SOTA_MSG_OnDKPSharedRangeQ		, 1, "$1 ДКП было распределено между $2 игроками в радиусе ($d ДКП на игрока, включая $3 в очереди)" },
-		{ SOTA_MSG_OnDKPReplaced			, 1, "$1 был заменен на $2 ($d ДКП)" }
-	}
-
-	-- Merge default messages into saved messages; in case we added some new event names.
-	local messages = SOTA_GetConfigurableTextMessages();
-	-- Если messages nil или пустая таблица - устанавливаем дефолтные значения
-	if not messages or table.getn(messages) == 0 then
-		-- Клонируем дефолтные сообщения
-		local clonedMessages = { };
-		for n=1, table.getn(defaultMessages), 1 do
-			clonedMessages[n] = { defaultMessages[n][1], defaultMessages[n][2], defaultMessages[n][3] };
-		end
-		SOTA_SetConfigurableTextMessages(clonedMessages);
-		return;
-	end;
-
-	-- Merge: добавляем новые сообщения, если они появились
-	for n=1,table.getn(defaultMessages), 1 do
-		local foundMessage = false;
-		for f=1,table.getn(messages), 1 do
-			if(messages[f][1] == defaultMessages[n][1]) then
-				foundMessage = true;
-				break;
-			end;
-		end;
-
-		if(not foundMessage) then
-			messages[table.getn(messages)+1] = defaultMessages[n];
-		end;
-	end
-
-	SOTA_SetConfigurableTextMessages(messages);
-end
 -- SOTA_CONFIG_Step				= 100;
 
 
@@ -2258,9 +2183,4 @@ function SOTA_ResetAllSettingsToDefault()
 	end
 end;
 
--- Инициализация сообщений при загрузке sota-core.lua
--- Если sota-options.lua уже загружен, его версия SOTA_VerifyEventMessages будет вызвана
--- Если нет, то заглушка просто создаст пустую таблицу
-if not SOTA_CONFIG_Messages or (type(SOTA_CONFIG_Messages) == "table" and table.getn(SOTA_CONFIG_Messages) == 0) then
-	SOTA_VerifyEventMessages();
-end
+
