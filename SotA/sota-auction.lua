@@ -1,4 +1,4 @@
-﻿
+
 --	State machine:
 local STATE_NONE				= 0
 local STATE_AUCTION_RUNNING		= 10
@@ -49,12 +49,13 @@ end
 function SOTA_StartAuction(msg)
 	local rank = SOTA_GetRaidRank(UnitName("player"));
 	if rank < 1 then
-		localEcho("You need to be Raid Assistant or Raid Leader to start auctions.");
+		localEcho("Нужно быть помощником или лидером рейда для запуска аукционов.");
 		return;
 	end
 
 	AuctionedItemMsg = msg;
 	
+	-- Парсим сообщение: ищем число в начале (минимальный бид) и itemlink
 	local t={}; 
 	local i=1;
     for w in string.gfind(msg, "%S+") do
@@ -62,11 +63,17 @@ function SOTA_StartAuction(msg)
         i = i + 1
     end
 	
+	-- Проверяем, является ли первый элемент числом (минимальный бид)
+	-- Если нет, значит сумма не указана, используем дефолт 100 ДКП
 	SOTA_Minimum_Bid = tonumber(t[1]);
+	if not SOTA_Minimum_Bid then
+		-- Если первый элемент не число, значит это itemlink, сумма не указана
+		SOTA_Minimum_Bid = 100;
+	end
 
 	local _, _, itemId = string.find(msg, "item:(%d+):")
 	if not itemId then
-		localEcho("Item was not found: ".. itemId);
+		localEcho("Предмет не найден: ".. itemId);
 		return;
 	end
 	local j, f = string.find(msg, "|.*")

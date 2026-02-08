@@ -10,16 +10,36 @@
 local SOTA_MAX_MESSAGES			= 15
 local ConfigurationDialogOpen	= false;
 
+-- SOTA_EchoEvent moved to sota-core.lua to ensure it's available when needed
 
-
-function SOTA_EchoEvent(msgKey, item, dkp, bidder, rank, param1, param2, param3)
-	local msgInfo = SOTA_getConfigurableMessage(msgKey, item, dkp, bidder, rank, param1, param2, param3);
-	publicEcho(msgInfo);
-end;
+-- Инициализация при загрузке файла
+-- Убеждаемся, что функции доступны сразу после загрузки
+if not SOTA_getConfigurableMessage then
+	-- Функция будет определена ниже, но мы проверяем её доступность
+end
 
 
 function SOTA_GetEventText(eventName)
+	if not SOTA_GetConfigurableTextMessages then
+		return nil;
+	end
+	
 	local messages = SOTA_GetConfigurableTextMessages();
+	
+	-- Проверяем, что messages не nil и является таблицей
+	if not messages or table.getn(messages) == 0 then
+		-- Если сообщения не инициализированы, инициализируем их
+		if SOTA_VerifyEventMessages then
+			SOTA_VerifyEventMessages();
+		end
+		if SOTA_GetConfigurableTextMessages then
+			messages = SOTA_GetConfigurableTextMessages();
+		end
+		-- Если все еще nil или пусто, возвращаем nil
+		if not messages or table.getn(messages) == 0 then
+			return nil;
+		end
+	end
 
 	for n = 1, table.getn(messages), 1 do
 		if(messages[n][1] == eventName) then
@@ -60,7 +80,15 @@ function SOTA_getConfigurableMessage(msgKey, item, dkp, bidder, rank, param1, pa
 	msg = string.gsub(msg, "$d", ""..dkp);
 	msg = string.gsub(msg, "$b", ""..bidder);
 	msg = string.gsub(msg, "$r", ""..rank);
-	msg = string.gsub(msg, "$m", ""..SOTA_GetMinimumBid());
+	
+	-- Защита от nil: SOTA_GetMinimumBid может вернуть nil
+	local minBid = SOTA_GetMinimumBid();
+	if minBid then
+		msg = string.gsub(msg, "$m", ""..minBid);
+	else
+		msg = string.gsub(msg, "$m", "0");
+	end
+	
 	msg = string.gsub(msg, "$s", UnitName("player"));
 	msg = string.gsub(msg, "$1", ""..param1);
 	msg = string.gsub(msg, "$2", ""..param2);
@@ -71,7 +99,16 @@ end;
 
 function SOTA_SetConfigurableMessage(event, channel, message)
 	--echo("Saving new message: Event: "..event..", Channel: "..channel..", Message: "..message);
+	if not SOTA_GetConfigurableTextMessages then
+		return;
+	end
+	
 	local messages = SOTA_GetConfigurableTextMessages();
+	
+	-- Проверяем, что messages не nil
+	if not messages then
+		messages = { };
+	end
 
 	for n=1,table.getn(messages),1 do
 		if(messages[n][1] == event) then
@@ -109,7 +146,16 @@ function SOTA_UpdateFramePos(frame)
 	end
 end;
 
+function SOTA_IsConfigurationDialogOpen()
+	return ConfigurationDialogOpen;
+end
+
 function SOTA_OpenConfigurationUI()
+	-- Убеждаемся, что сообщения инициализированы
+	if not SOTA_CONFIG_Messages or (type(SOTA_CONFIG_Messages) == "table" and table.getn(SOTA_CONFIG_Messages) == 0) then
+		SOTA_VerifyEventMessages();
+	end
+
 	ConfigurationDialogOpen = true;
 	SOTA_RefreshBossDKPValues();
 
@@ -125,6 +171,7 @@ end
 function SOTA_CloseAllConfig()
 	FrameConfigBidding:Hide();
 	FrameConfigBossDkp:Hide();
+	FrameConfigItemDkp:Hide();
 	FrameConfigMiscDkp:Hide();
 	FrameConfigMessage:Hide();
 	FrameConfigBidRules:Hide();
@@ -153,6 +200,12 @@ function SOTA_OpenBossDkpConfig()
 	FrameConfigBossDkp:Show();
 end
 
+function SOTA_OpenItemDkpConfig()
+	SOTA_CloseAllConfig();
+	SOTA_RefreshItemDKPValues();
+	FrameConfigItemDkp:Show();
+end
+
 function SOTA_OpenMiscDkpConfig()
 	SOTA_CloseAllConfig();
 	FrameConfigMiscDkp:Show();
@@ -160,6 +213,10 @@ end
 
 function SOTA_OpenMessageConfig()
 	SOTA_CloseAllConfig();
+	-- Убеждаемся, что сообщения инициализированы
+	SOTA_VerifyEventMessages();
+	-- Обновляем список сообщений в UI
+	SOTA_UpdateTextList();
 	FrameConfigMessage:Show();
 end
 
@@ -176,147 +233,627 @@ function SOTA_OpenSyncCfgConfig()
 end;
 
 function SOTA_OnOptionAuctionTimeChanged(object)
-	SOTA_CONFIG_AuctionTime = tonumber( getglobal(object:GetName()):GetValue() );
+	local slider = getglobal(object:GetName());
+	if not slider then return; end
+	
+	SOTA_CONFIG_AuctionTime = tonumber(slider:GetValue()) or 20;
 	
 	local valueString = "".. SOTA_CONFIG_AuctionTime;
 	if SOTA_CONFIG_AuctionTime == 0 then
-		valueString = "(No timer)";
+		valueString = "(Без таймера)";
 	end
-		
-	getglobal(object:GetName().."Text"):SetText(string.format("Auction Time: %s seconds", valueString))
+	
+	local textFrame = getglobal(object:GetName().."Text");
+	if textFrame then
+		textFrame:SetText(string.format("Время аукциона: %s сек", valueString));
+	end
 end
 
 function SOTA_OnOptionAuctionExtensionChanged(object)
-	SOTA_CONFIG_AuctionExtension = tonumber( getglobal(object:GetName()):GetValue() );
+	local slider = getglobal(object:GetName());
+	if not slider then return; end
+	
+	SOTA_CONFIG_AuctionExtension = tonumber(slider:GetValue()) or 8;
 	
 	local valueString = "".. SOTA_CONFIG_AuctionExtension;
 	if SOTA_CONFIG_AuctionExtension == 0 then
-		valueString = "(No extension)";
+		valueString = "(Без продления)";
 	end
-		
-	getglobal(object:GetName().."Text"):SetText(string.format("Auction Extension: %s seconds", valueString))
+	
+	local textFrame = getglobal(object:GetName().."Text");
+	if textFrame then
+		textFrame:SetText(string.format("Продление аукциона: %s сек", valueString));
+	end
 end
 
 function SOTA_OnOptionDKPStringLengthChanged(object)
-	SOTA_CONFIG_DKPStringLength = tonumber( getglobal(object:GetName()):GetValue() );
+	local slider = getglobal(object:GetName());
+	if not slider then return; end
+	
+	SOTA_CONFIG_DKPStringLength = tonumber(slider:GetValue()) or 5;
 	
 	local valueString = "".. SOTA_CONFIG_DKPStringLength;
 	if SOTA_CONFIG_DKPStringLength == 0 then
 		valueString = "(No limit)";
 	end
-		
-	getglobal(object:GetName().."Text"):SetText(string.format("DKP String Length: %s", valueString))
+	
+	local textFrame = getglobal(object:GetName().."Text");
+	if textFrame then
+		textFrame:SetText(string.format("Длина строки DKP: %s", valueString));
+	end
 end
 
 function SOTA_OnOptionMinimumDKPPenaltyChanged(object)
-	SOTA_CONFIG_MinimumDKPPenalty = tonumber( getglobal(object:GetName()):GetValue() );
+	local slider = getglobal(object:GetName());
+	if not slider then return; end
+	
+	SOTA_CONFIG_MinimumDKPPenalty = tonumber(slider:GetValue()) or 50;
 	
 	local valueString = "".. SOTA_CONFIG_MinimumDKPPenalty;
 	if SOTA_CONFIG_MinimumDKPPenalty == 0 then
 		valueString = "(None)";
 	end
 	
-	getglobal(object:GetName().."Text"):SetText(string.format("Minimum DKP penalty: %s", valueString))
+	local textFrame = getglobal(object:GetName().."Text");
+	if textFrame then
+		textFrame:SetText(string.format("Минимальный штраф DKP: %s", valueString));
+	end
 end
 
 function SOTA_RefreshBossDKPValues()
-	getglobal("FrameConfigBossDkp_20Mans"):SetValue(SOTA_GetBossDKPValue("20Mans"));
-	getglobal("FrameConfigBossDkp_MoltenCore"):SetValue(SOTA_GetBossDKPValue("MoltenCore"));
-	getglobal("FrameConfigBossDkp_Onyxia"):SetValue(SOTA_GetBossDKPValue("Onyxia"));
-	getglobal("FrameConfigBossDkp_BlackwingLair"):SetValue(SOTA_GetBossDKPValue("BlackwingLair"));
-	getglobal("FrameConfigBossDkp_AQ40"):SetValue(SOTA_GetBossDKPValue("AQ40"));
-	getglobal("FrameConfigBossDkp_Naxxramas"):SetValue(SOTA_GetBossDKPValue("Naxxramas"));
-	getglobal("FrameConfigBossDkp_WorldBosses"):SetValue(SOTA_GetBossDKPValue("WorldBosses"));
+	local frame;
+	local value;
+	local valueString;
+	local textFrame;
+	
+	frame = getglobal("FrameConfigBossDkp_20Mans");
+	if frame then 
+		value = SOTA_GetBossDKPValue("20Mans");
+		frame:SetValue(value);
+		valueString = string.format("20 mans (ZG, AQ20): %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_20MansText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
+	frame = getglobal("FrameConfigBossDkp_MoltenCore");
+	if frame then 
+		value = SOTA_GetBossDKPValue("MoltenCore");
+		frame:SetValue(value);
+		valueString = string.format("Molten Core: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_MoltenCoreText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
+	frame = getglobal("FrameConfigBossDkp_Onyxia");
+	if frame then 
+		value = SOTA_GetBossDKPValue("Onyxia");
+		frame:SetValue(value);
+		valueString = string.format("Onyxia: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_OnyxiaText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
+	frame = getglobal("FrameConfigBossDkp_BlackwingLair");
+	if frame then 
+		value = SOTA_GetBossDKPValue("BlackwingLair");
+		frame:SetValue(value);
+		valueString = string.format("Blackwing Lair: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_BlackwingLairText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
+	frame = getglobal("FrameConfigBossDkp_AQ40");
+	if frame then 
+		value = SOTA_GetBossDKPValue("AQ40");
+		frame:SetValue(value);
+		valueString = string.format("Temple of Ahn'Qiraj: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_AQ40Text");
+		if textFrame then textFrame:SetText(valueString); end
+	end
+	frame = getglobal("FrameConfigBossDkp_Naxxramas");
+	if frame then 
+		value = SOTA_GetBossDKPValue("Naxxramas");
+		frame:SetValue(value);
+		valueString = string.format("Naxxramas: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_NaxxramasText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
+	frame = getglobal("FrameConfigBossDkp_UpperKarazhan");
+	if frame then 
+		value = SOTA_GetBossDKPValue("UpperKarazhan");
+		frame:SetValue(value);
+		valueString = string.format("Upper Karazhan: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_UpperKarazhanText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
+	frame = getglobal("FrameConfigBossDkp_WorldBosses");
+	if frame then 
+		value = SOTA_GetBossDKPValue("WorldBosses");
+		frame:SetValue(value);
+		valueString = string.format("World Bosses: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_WorldBossesText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
+end
+
+function SOTA_RefreshItemDKPValues()
+	local itemList = SOTA_GetItemDKPList();
+	if not itemList or table.getn(itemList) == 0 then
+		return;
+	end
+	
+	local frame;
+	-- Убийство босса (из Boss DKP) - используем функцию для безопасного получения значений
+	frame = getglobal("FrameConfigItemDkp_Kill_BWL");
+	if frame then frame:SetText(SOTA_GetBossDKPValue("BlackwingLair") or 200); end
+	frame = getglobal("FrameConfigItemDkp_Kill_AQ40");
+	if frame then frame:SetText(SOTA_GetBossDKPValue("AQ40") or 300); end
+	frame = getglobal("FrameConfigItemDkp_Kill_NAXX");
+	if frame then frame:SetText(SOTA_GetBossDKPValue("Naxxramas") or 100); end
+	frame = getglobal("FrameConfigItemDkp_Kill_KARA");
+	if frame then frame:SetText(SOTA_GetBossDKPValue("UpperKarazhan") or 400); end
+	
+	-- Одежда
+	if itemList[1] then
+		frame = getglobal("FrameConfigItemDkp_Cloth_BWL");
+		if frame then frame:SetText(itemList[1][2] or 200); end
+		frame = getglobal("FrameConfigItemDkp_Cloth_AQ40");
+		if frame then frame:SetText(itemList[1][3] or 400); end
+		frame = getglobal("FrameConfigItemDkp_Cloth_NAXX");
+		if frame then frame:SetText(itemList[1][4] or 100); end
+		frame = getglobal("FrameConfigItemDkp_Cloth_KARA");
+		if frame then frame:SetText(itemList[1][5] or 400); end
+	end
+	
+	-- Пушка
+	if itemList[2] then
+		frame = getglobal("FrameConfigItemDkp_Gun_BWL");
+		if frame then frame:SetText(itemList[2][2] or 500); end
+		frame = getglobal("FrameConfigItemDkp_Gun_AQ40");
+		if frame then frame:SetText(itemList[2][3] or 500); end
+		frame = getglobal("FrameConfigItemDkp_Gun_NAXX");
+		if frame then frame:SetText(itemList[2][4] or 300); end
+		frame = getglobal("FrameConfigItemDkp_Gun_KARA");
+		if frame then frame:SetText(itemList[2][5] or 500); end
+	end
+	
+	-- Ванда
+	if itemList[3] then
+		frame = getglobal("FrameConfigItemDkp_Wand_BWL");
+		if frame then frame:SetText(itemList[3][2] or 500); end
+		frame = getglobal("FrameConfigItemDkp_Wand_AQ40");
+		if frame then frame:SetText(itemList[3][3] or 500); end
+		frame = getglobal("FrameConfigItemDkp_Wand_NAXX");
+		if frame then frame:SetText(itemList[3][4] or 300); end
+		frame = getglobal("FrameConfigItemDkp_Wand_KARA");
+		if frame then frame:SetText(itemList[3][5] or 500); end
+	end
+	
+	-- Кольца
+	if itemList[4] then
+		frame = getglobal("FrameConfigItemDkp_Ring_BWL");
+		if frame then frame:SetText(itemList[4][2] or 500); end
+		frame = getglobal("FrameConfigItemDkp_Ring_AQ40");
+		if frame then frame:SetText(itemList[4][3] or 900); end
+		frame = getglobal("FrameConfigItemDkp_Ring_NAXX");
+		if frame then frame:SetText(itemList[4][4] or 500); end
+		frame = getglobal("FrameConfigItemDkp_Ring_KARA");
+		if frame then frame:SetText(itemList[4][5] or 900); end
+	end
+	
+	-- Тринкет
+	if itemList[5] then
+		frame = getglobal("FrameConfigItemDkp_Trinket_BWL");
+		if frame then frame:SetText(itemList[5][2] or 300); end
+		frame = getglobal("FrameConfigItemDkp_Trinket_AQ40");
+		if frame then frame:SetText(itemList[5][3] or 500); end
+		frame = getglobal("FrameConfigItemDkp_Trinket_NAXX");
+		if frame then frame:SetText(itemList[5][4] or 300); end
+		frame = getglobal("FrameConfigItemDkp_Trinket_KARA");
+		if frame then frame:SetText(itemList[5][5] or 500); end
+	end
+	
+	-- Прочее
+	if itemList[6] then
+		frame = getglobal("FrameConfigItemDkp_Other_BWL");
+		if frame then frame:SetText(itemList[6][2] or 200); end
+		frame = getglobal("FrameConfigItemDkp_Other_AQ40");
+		if frame then frame:SetText(itemList[6][3] or 500); end
+		frame = getglobal("FrameConfigItemDkp_Other_NAXX");
+		if frame then frame:SetText(itemList[6][4] or 500); end
+		frame = getglobal("FrameConfigItemDkp_Other_KARA");
+		if frame then frame:SetText(itemList[6][5] or 500); end
+	end
+end
+
+function SOTA_SaveItemDKPValues()
+	-- Сохраняем значения из EditBox'ов в конфиг
+	if not SOTA_GetItemDKPList or not SOTA_SetBossDKPValue then
+		return;
+	end
+	
+	local itemList = SOTA_GetItemDKPList();
+	if not itemList or table.getn(itemList) == 0 then
+		return;
+	end
+	
+	local frame;
+	local value;
+	
+	-- Убийство босса (сохраняем в Boss DKP)
+	frame = getglobal("FrameConfigItemDkp_Kill_BWL");
+	if frame then
+		value = tonumber(frame:GetText());
+		if value then SOTA_SetBossDKPValue("BlackwingLair", value); end
+	end
+	frame = getglobal("FrameConfigItemDkp_Kill_AQ40");
+	if frame then
+		value = tonumber(frame:GetText());
+		if value then SOTA_SetBossDKPValue("AQ40", value); end
+	end
+	frame = getglobal("FrameConfigItemDkp_Kill_NAXX");
+	if frame then
+		value = tonumber(frame:GetText());
+		if value then SOTA_SetBossDKPValue("Naxxramas", value); end
+	end
+	frame = getglobal("FrameConfigItemDkp_Kill_KARA");
+	if frame then
+		value = tonumber(frame:GetText());
+		if value then SOTA_SetBossDKPValue("UpperKarazhan", value); end
+	end
+	
+	-- Одежда
+	if itemList[1] then
+		frame = getglobal("FrameConfigItemDkp_Cloth_BWL");
+		if frame then itemList[1][2] = tonumber(frame:GetText()) or 200; end
+		frame = getglobal("FrameConfigItemDkp_Cloth_AQ40");
+		if frame then itemList[1][3] = tonumber(frame:GetText()) or 400; end
+		frame = getglobal("FrameConfigItemDkp_Cloth_NAXX");
+		if frame then itemList[1][4] = tonumber(frame:GetText()) or 100; end
+		frame = getglobal("FrameConfigItemDkp_Cloth_KARA");
+		if frame then itemList[1][5] = tonumber(frame:GetText()) or 400; end
+	end
+	
+	-- Пушка
+	if itemList[2] then
+		frame = getglobal("FrameConfigItemDkp_Gun_BWL");
+		if frame then itemList[2][2] = tonumber(frame:GetText()) or 500; end
+		frame = getglobal("FrameConfigItemDkp_Gun_AQ40");
+		if frame then itemList[2][3] = tonumber(frame:GetText()) or 500; end
+		frame = getglobal("FrameConfigItemDkp_Gun_NAXX");
+		if frame then itemList[2][4] = tonumber(frame:GetText()) or 300; end
+		frame = getglobal("FrameConfigItemDkp_Gun_KARA");
+		if frame then itemList[2][5] = tonumber(frame:GetText()) or 500; end
+	end
+	
+	-- Ванда
+	if itemList[3] then
+		frame = getglobal("FrameConfigItemDkp_Wand_BWL");
+		if frame then itemList[3][2] = tonumber(frame:GetText()) or 500; end
+		frame = getglobal("FrameConfigItemDkp_Wand_AQ40");
+		if frame then itemList[3][3] = tonumber(frame:GetText()) or 500; end
+		frame = getglobal("FrameConfigItemDkp_Wand_NAXX");
+		if frame then itemList[3][4] = tonumber(frame:GetText()) or 300; end
+		frame = getglobal("FrameConfigItemDkp_Wand_KARA");
+		if frame then itemList[3][5] = tonumber(frame:GetText()) or 500; end
+	end
+	
+	-- Кольца
+	if itemList[4] then
+		frame = getglobal("FrameConfigItemDkp_Ring_BWL");
+		if frame then itemList[4][2] = tonumber(frame:GetText()) or 500; end
+		frame = getglobal("FrameConfigItemDkp_Ring_AQ40");
+		if frame then itemList[4][3] = tonumber(frame:GetText()) or 900; end
+		frame = getglobal("FrameConfigItemDkp_Ring_NAXX");
+		if frame then itemList[4][4] = tonumber(frame:GetText()) or 500; end
+		frame = getglobal("FrameConfigItemDkp_Ring_KARA");
+		if frame then itemList[4][5] = tonumber(frame:GetText()) or 900; end
+	end
+	
+	-- Тринкет
+	if itemList[5] then
+		frame = getglobal("FrameConfigItemDkp_Trinket_BWL");
+		if frame then itemList[5][2] = tonumber(frame:GetText()) or 300; end
+		frame = getglobal("FrameConfigItemDkp_Trinket_AQ40");
+		if frame then itemList[5][3] = tonumber(frame:GetText()) or 500; end
+		frame = getglobal("FrameConfigItemDkp_Trinket_NAXX");
+		if frame then itemList[5][4] = tonumber(frame:GetText()) or 300; end
+		frame = getglobal("FrameConfigItemDkp_Trinket_KARA");
+		if frame then itemList[5][5] = tonumber(frame:GetText()) or 500; end
+	end
+	
+	-- Прочее
+	if itemList[6] then
+		frame = getglobal("FrameConfigItemDkp_Other_BWL");
+		if frame then itemList[6][2] = tonumber(frame:GetText()) or 200; end
+		frame = getglobal("FrameConfigItemDkp_Other_AQ40");
+		if frame then itemList[6][3] = tonumber(frame:GetText()) or 500; end
+		frame = getglobal("FrameConfigItemDkp_Other_NAXX");
+		if frame then itemList[6][4] = tonumber(frame:GetText()) or 500; end
+		frame = getglobal("FrameConfigItemDkp_Other_KARA");
+		if frame then itemList[6][5] = tonumber(frame:GetText()) or 500; end
+	end
+	
+	SOTA_CONFIG_ItemDKP = itemList;
+	localEcho("Item DKP настройки сохранены!");
 end
 
 function SOTA_OnOptionBossDKPChanged(object)
-	local slider = object:GetName();
-	local value = tonumber( getglobal(object:GetName()):GetValue() );
+	local sliderName = object:GetName();
+	local slider = getglobal(sliderName);
+	if not slider then return; end
+	
+	local value = tonumber(slider:GetValue());
+	if not value then return; end
+	
 	local valueString = "";
 	
-	if slider == "FrameConfigBossDkp_20Mans" then
+	if not SOTA_SetBossDKPValue then
+		return;
+	end
+	
+	if sliderName == "FrameConfigBossDkp_20Mans" then
 		SOTA_SetBossDKPValue("20Mans", value);
 		valueString = string.format("20 mans (ZG, AQ20): %d DKP", value);
-	elseif slider == "FrameConfigBossDkp_MoltenCore" then
-		SOTA_SetBossDKPValue("Molten Core", value);
+	elseif sliderName == "FrameConfigBossDkp_MoltenCore" then
+		SOTA_SetBossDKPValue("MoltenCore", value);
 		valueString = string.format("Molten Core: %d DKP", value);
-	elseif slider == "FrameConfigBossDkp_Onyxia" then
+	elseif sliderName == "FrameConfigBossDkp_Onyxia" then
 		SOTA_SetBossDKPValue("Onyxia", value);
 		valueString = string.format("Onyxia: %d DKP", value);
-	elseif slider == "FrameConfigBossDkp_BlackwingLair" then
+	elseif sliderName == "FrameConfigBossDkp_BlackwingLair" then
 		SOTA_SetBossDKPValue("BlackwingLair", value);
 		valueString = string.format("Blackwing Lair: %d DKP", value);
-	elseif slider == "FrameConfigBossDkp_AQ40" then
+	elseif sliderName == "FrameConfigBossDkp_AQ40" then
 		SOTA_SetBossDKPValue("AQ40", value);
 		valueString = string.format("Temple of Ahn'Qiraj: %d DKP", value);
-	elseif slider == "FrameConfigBossDkp_Naxxramas" then
+	elseif sliderName == "FrameConfigBossDkp_Naxxramas" then
 		SOTA_SetBossDKPValue("Naxxramas", value);
 		valueString = string.format("Naxxramas: %d DKP", value);
-	elseif slider == "FrameConfigBossDkp_WorldBosses" then
+	elseif sliderName == "FrameConfigBossDkp_UpperKarazhan" then
+		SOTA_SetBossDKPValue("UpperKarazhan", value);
+		valueString = string.format("Upper Karazhan: %d DKP", value);
+	elseif sliderName == "FrameConfigBossDkp_WorldBosses" then
 		SOTA_SetBossDKPValue("WorldBosses", value);
 		valueString = string.format("World Bosses: %d DKP", value);
 	end
 
-	getglobal(slider.."Text"):SetText(valueString);
+	local textFrame = getglobal(sliderName.."Text");
+	if textFrame then
+		textFrame:SetText(valueString);
+	end
 end
 
 function SOTA_InitializeConfigSettings()
-    if not SOTA_CONFIG_UseGuildNotes then
+	-- ЛОГИКА: Переменные уже инициализированы в sota-core.lua с дефолтными значениями
+	-- WoW загружает SavedVariables ПЕРЕД вызовом этой функции
+	-- Если переменная была загружена из SavedVariables - она имеет значение (даже если 0)
+	-- Если переменная НЕ была загружена - она остается с дефолтным значением из sota-core.lua
+	-- Поэтому здесь мы проверяем только те переменные, которые могут быть nil:
+	-- Используем == nil, а не "if not", чтобы не перезаписывать сохраненные 0 значения
+	
+	local loadedFromSaved = 0;
+	local createdDefaults = 0;
+	local savedVarsStatus = {};
+	
+	-- Pane 3: Misc DKP - проверяем на nil (если не загружено из SavedVariables)
+	if SOTA_CONFIG_UseGuildNotes == nil then
 		SOTA_CONFIG_UseGuildNotes = 0;
-    end
-    if not SOTA_CONFIG_MinimumBidStrategy then
-		SOTA_CONFIG_MinimumBidStrategy = 0;
-    end
-	if not SOTA_CONFIG_DKPStringLength then
-		SOTA_CONFIG_DKPStringLength = 5;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_UseGuildNotes"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_UseGuildNotes"] = "загружено из SavedVariables";
 	end
-	if not SOTA_CONFIG_MinimumDKPPenalty then
+	if SOTA_CONFIG_MinimumBidStrategy == nil then
+		SOTA_CONFIG_MinimumBidStrategy = 1;  -- По умолчанию: Минимальное увеличение на 100 ДКП
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_MinimumBidStrategy"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_MinimumBidStrategy"] = "загружено из SavedVariables";
+	end
+	if SOTA_CONFIG_DKPStringLength == nil then
+		SOTA_CONFIG_DKPStringLength = 5;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_DKPStringLength"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_DKPStringLength"] = "загружено из SavedVariables";
+	end
+	if SOTA_CONFIG_MinimumDKPPenalty == nil then
 		SOTA_CONFIG_MinimumDKPPenalty = 50;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_MinimumDKPPenalty"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_MinimumDKPPenalty"] = "загружено из SavedVariables";
 	end
 
-	-- Update GUI:
-	if not SOTA_CONFIG_EnableOSBidding then
+	-- Pane 1: Основные настройки - проверяем на nil
+	-- Эти переменные уже инициализированы в sota-core.lua, но проверяем на всякий случай
+	if SOTA_CONFIG_EnableOSBidding == nil then
 		SOTA_CONFIG_EnableOSBidding = 1;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_EnableOSBidding"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_EnableOSBidding"] = "загружено из SavedVariables";
 	end
-	if not SOTA_CONFIG_EnableZoneCheck then
+	if SOTA_CONFIG_EnableZoneCheck == nil then
 		SOTA_CONFIG_EnableZoneCheck = 1;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_EnableZoneCheck"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_EnableZoneCheck"] = "загружено из SavedVariables";
 	end
-	if not SOTA_CONFIG_EnableOnlineCheck then
+	if SOTA_CONFIG_EnableOnlineCheck == nil then
 		SOTA_CONFIG_EnableOnlineCheck = 1;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_EnableOnlineCheck"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_EnableOnlineCheck"] = "загружено из SavedVariables";
 	end
-	if not SOTA_CONFIG_AllowPlayerPass then
-		SOTA_CONFIG_AllowPlayerPass = 1;
-	end;
-	if not SOTA_CONFIG_DisableDashboard then
-		SOTA_CONFIG_DisableDashboard = 1;
+	if SOTA_CONFIG_AllowPlayerPass == nil then
+		SOTA_CONFIG_AllowPlayerPass = 0;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_AllowPlayerPass"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_AllowPlayerPass"] = "загружено из SavedVariables";
 	end
-	if not SOTA_CONFIG_OutputChannel then
+	if SOTA_CONFIG_DisableDashboard == nil then
+		SOTA_CONFIG_DisableDashboard = 0;  -- Исправлено: должно быть 0, а не 1
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_DisableDashboard"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_DisableDashboard"] = "загружено из SavedVariables";
+	end
+	if SOTA_CONFIG_OutputChannel == nil then
 		SOTA_CONFIG_OutputChannel = WARN_CHANNEL;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_OutputChannel"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_OutputChannel"] = "загружено из SavedVariables";
 	end
-	if not SOTA_HISTORY_DKP then
+	if SOTA_CONFIG_Messages == nil then
+		SOTA_CONFIG_Messages = { };
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_Messages"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_Messages"] = "загружено из SavedVariables";
+	end
+	if SOTA_HISTORY_DKP == nil then
 		SOTA_HISTORY_DKP = { };
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_HISTORY_DKP"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_HISTORY_DKP"] = "загружено из SavedVariables";
 	end
+	
+	-- Проверяем AuctionTime и AuctionExtension (из SOTA.toc)
+	-- Эти переменные инициализированы в sota-core.lua, поэтому они не будут nil
+	-- WoW загружает SavedVariables ПЕРЕД выполнением кода, поэтому если они были сохранены,
+	-- они будут иметь сохраненное значение, иначе - дефолтное из sota-core.lua
+	-- Мы не можем точно определить, были ли они загружены, поэтому считаем их загруженными
+	-- (это нормально, так как они всегда имеют значение)
+	loadedFromSaved = loadedFromSaved + 1;
+	savedVarsStatus["SOTA_CONFIG_AuctionTime"] = "инициализировано (дефолт или из SavedVariables)";
+	loadedFromSaved = loadedFromSaved + 1;
+	savedVarsStatus["SOTA_CONFIG_AuctionExtension"] = "инициализировано (дефолт или из SavedVariables)";
+	
+	-- Проверяем VersionNumber и VersionDate (из SOTA.toc)
+	if SOTA_CONFIG_VersionNumber == nil then
+		SOTA_CONFIG_VersionNumber = nil;  -- Может быть nil
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_VersionNumber"] = "создано по умолчанию (nil)";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_VersionNumber"] = "загружено из SavedVariables";
+	end
+	if SOTA_CONFIG_VersionDate == nil then
+		SOTA_CONFIG_VersionDate = nil;  -- Может быть nil
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_VersionDate"] = "создано по умолчанию (nil)";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_VersionDate"] = "загружено из SavedVariables";
+	end
+	
+	-- Проверяем таблицы BossDKP и ItemDKP
+	local bossDkpLoaded = false;
+	if SOTA_CONFIG_BossDKP and type(SOTA_CONFIG_BossDKP) == "table" and table.getn(SOTA_CONFIG_BossDKP) > 0 then
+		bossDkpLoaded = true;
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_BossDKP"] = "загружено из SavedVariables";
+	else
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_BossDKP"] = "создано по умолчанию";
+	end
+	
+	local itemDkpLoaded = false;
+	if SOTA_CONFIG_ItemDKP and type(SOTA_CONFIG_ItemDKP) == "table" and table.getn(SOTA_CONFIG_ItemDKP) > 0 then
+		itemDkpLoaded = true;
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_ItemDKP"] = "загружено из SavedVariables";
+	else
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_ItemDKP"] = "создано по умолчанию";
+	end
+	
+	-- Инициализируем Boss DKP дефолтными значениями, если таблица пустая или не существует
+	SOTA_GetBossDKPList();  -- Это применит дефолтные значения, если таблица пустая
+	
+	-- Инициализируем Item DKP дефолтными значениями, если таблица пустая или не существует
+	SOTA_GetItemDKPList();  -- Это применит дефолтные значения, если таблица пустая
+	
+	-- Инициализируем сообщения дефолтными значениями, если таблица пустая или не существует
+	SOTA_VerifyEventMessages();  -- Это заполнит дефолтными сообщениями, если таблица пустая
 
 	
-	getglobal("FrameConfigBiddingMSoverOSPriority"):SetChecked(SOTA_CONFIG_EnableOSBidding);
-	getglobal("FrameConfigBiddingEnableZonecheck"):SetChecked(SOTA_CONFIG_EnableZoneCheck);
-	getglobal("FrameConfigBiddingEnableOnlinecheck"):SetChecked(SOTA_CONFIG_EnableOnlineCheck);
-	getglobal("FrameConfigBiddingAllowPlayerPass"):SetChecked(SOTA_CONFIG_AllowPlayerPass);
-	getglobal("FrameConfigBiddingDisableDashboard"):SetChecked(SOTA_CONFIG_DisableDashboard);
+	local frame;
+	frame = getglobal("FrameConfigBiddingMSoverOSPriority");
+	if frame then frame:SetChecked(SOTA_CONFIG_EnableOSBidding); end
+	frame = getglobal("FrameConfigBiddingEnableZonecheck");
+	if frame then frame:SetChecked(SOTA_CONFIG_EnableZoneCheck); end
+	frame = getglobal("FrameConfigBiddingEnableOnlinecheck");
+	if frame then frame:SetChecked(SOTA_CONFIG_EnableOnlineCheck); end
+	frame = getglobal("FrameConfigBiddingAllowPlayerPass");
+	if frame then frame:SetChecked(SOTA_CONFIG_AllowPlayerPass); end
+	frame = getglobal("FrameConfigBiddingDisableDashboard");
+	if frame then frame:SetChecked(SOTA_CONFIG_DisableDashboard); end
 
 	if SOTA_CONFIG_UseGuildNotes == 1 then
-		getglobal("FrameConfigMiscDkpPublicNotes"):SetChecked(1)
+		frame = getglobal("FrameConfigMiscDkpPublicNotes");
+		if frame then frame:SetChecked(1); end
 	end
 
-	getglobal("FrameConfigMiscDkpMinBidStrategy".. SOTA_CONFIG_MinimumBidStrategy):SetChecked(1)
-	getglobal("FrameConfigMiscDkpDKPStringLength"):SetValue(SOTA_CONFIG_DKPStringLength);
-	getglobal("FrameConfigMiscDkpMinimumDKPPenalty"):SetValue(SOTA_CONFIG_MinimumDKPPenalty);
-	getglobal("FrameConfigBiddingAuctionTime"):SetValue(SOTA_CONFIG_AuctionTime);
-	getglobal("FrameConfigBiddingAuctionExtension"):SetValue(SOTA_CONFIG_AuctionExtension);
+	frame = getglobal("FrameConfigMiscDkpMinBidStrategy".. SOTA_CONFIG_MinimumBidStrategy);
+	if frame then frame:SetChecked(1); end
+	frame = getglobal("FrameConfigMiscDkpDKPStringLength");
+	if frame then frame:SetValue(SOTA_CONFIG_DKPStringLength); end
+	frame = getglobal("FrameConfigMiscDkpMinimumDKPPenalty");
+	if frame then frame:SetValue(SOTA_CONFIG_MinimumDKPPenalty); end
+	frame = getglobal("FrameConfigBiddingAuctionTime");
+	if frame then frame:SetValue(SOTA_CONFIG_AuctionTime); end
+	frame = getglobal("FrameConfigBiddingAuctionExtension");
+	if frame then frame:SetValue(SOTA_CONFIG_AuctionExtension); end
 	
 	SOTA_RefreshBossDKPValues();
 
 	SOTA_VerifyEventMessages();
+	
+	--[[ Отладочные сообщения о загрузке настроек
+	-- Выводим диагностическую информацию
+	echo(SOTA_COLOUR_CHAT .. "========================================");
+	localEcho(string.format("Настройки загружены. Загружено из SavedVariables: %d, создано по умолчанию: %d", loadedFromSaved, createdDefaults));
+	echo(SOTA_COLOUR_CHAT .. "========================================");
+	
+	-- Если много переменных создано по умолчанию, предупреждаем о возможной проблеме
+	if createdDefaults > 8 then
+		localEcho("SOTA: ВНИМАНИЕ! Большинство настроек создано по умолчанию. Возможные причины:");
+		localEcho("  1. Проверьте файл SOTA.toc - список ## SavedVariables должен быть правильным");
+		localEcho("  2. Проверьте файл SOTA.lua в папке WTF\\Account\\<ваш_аккаунт>\\SavedVariables\\");
+		localEcho("  3. Убедитесь, что в SOTA.toc нет опечаток в именах переменных (проверьте запятые)");
+		localEcho("  4. Если файл SOTA.lua существует, проверьте его синтаксис на ошибки");
+		localEcho("  5. Убедитесь, что имена переменных в SOTA.toc точно совпадают с именами в коде");
+		localEcho("SOTA: Детали инициализации переменных (созданные по умолчанию):");
+		for varName, status in pairs(savedVarsStatus) do
+			if string.find(status, "создано по умолчанию") then
+				localEcho(string.format("  - %s: %s", varName, status));
+			end
+		end
+	elseif createdDefaults > 0 then
+		localEcho("SOTA: Некоторые настройки созданы по умолчанию (это нормально при первом запуске):");
+		for varName, status in pairs(savedVarsStatus) do
+			if string.find(status, "создано по умолчанию") then
+				localEcho(string.format("  - %s", varName));
+			end
+		end
+	end
+	--]]
 end
 
 
@@ -325,50 +862,60 @@ function SOTA_VerifyEventMessages()
 	-- Syntax: [index] = { EVENT_NAME, CHANNEL, TEXT }
 	-- Channel value: 0: Off, 1: RW, 2: Raid, 3: Guild, 4: Yell, 5: Say
 	local defaultMessages = { 
-		{ SOTA_MSG_OnOpen					, 1, "Auction open for $i" },
-		{ SOTA_MSG_OnAnnounceBid			, 2, "/w $s bid <your bid>" },
-		{ SOTA_MSG_OnAnnounceMinBid			, 2, "Minimum bid: $m DKP" },
-		{ SOTA_MSG_ExtraInfo				, 2, "Step is 100 DKP"},
-		{ SOTA_MSG_On10SecondsLeft			, 2, "10 seconds left for $i" },
-		{ SOTA_MSG_On9SecondsLeft			, 2, "9 seconds left" },
-		{ SOTA_MSG_On8SecondsLeft			, 0, "8 seconds left" },
-		{ SOTA_MSG_On7SecondsLeft			, 0, "7 seconds left" },
-		{ SOTA_MSG_On6SecondsLeft			, 0, "6 seconds left" },
-		{ SOTA_MSG_On5SecondsLeft			, 0, "5 seconds left" },
-		{ SOTA_MSG_On4SecondsLeft			, 0, "4 seconds left" },
-		{ SOTA_MSG_On3SecondsLeft			, 2, "3 seconds left" },
-		{ SOTA_MSG_On2SecondsLeft			, 2, "2 seconds left" },
-		{ SOTA_MSG_On1SecondLeft			, 2, "1 second left" },
-		{ SOTA_MSG_OnMainspecBid			, 1, "$b ($r) is bidding $d DKP for $i" },
-		{ SOTA_MSG_OnOffspecBid				, 1, "$b is bidding $d Off-spec for $i" },
-		{ SOTA_MSG_OnMainspecMaxBid			, 1, "$b ($r) went all in ($d DKP) for $i" },
-		{ SOTA_MSG_OnOffspecMaxBid			, 1, "$b went all in ($d) Off-spec for $i" },
-		{ SOTA_MSG_OnComplete				, 2, "$i sold to $b for $d DKP." },
-		{ SOTA_MSG_OnPause					, 2, "Auction has been Paused" },
-		{ SOTA_MSG_OnResume					, 2, "Auction has been Resumed" },
-		{ SOTA_MSG_OnClose					, 1, "Auction for $i is over" },
-		{ SOTA_MSG_OnBidCancel				, 1, "Ставка $b была отменена, наивысшая ставка теперь $d"},
-		{ SOTA_MSG_OnCancel					, 1, "Auction was Cancelled" },
-		{ SOTA_MSG_OnDKPAdded				, 1, "$d DKP was added to $b" },
-		{ SOTA_MSG_OnDKPAddedRaid			, 1, "$d DKP was added to all players in raid" },
-		{ SOTA_MSG_OnDKPAddedRaidAttendance	, 1, "$d DKP was added to all players in raid for attendance" },
-		{ SOTA_MSG_OnDKPAddedRaidNoWipes	, 1, "$d DKP was added to all players in raid for no wipes" },
-		{ SOTA_MSG_OnDKPAddedRange			, 1, "$d DKP has been added for $1 players in range." },
-		{ SOTA_MSG_OnDKPAddedQueue			, 1, "$d DKP has been added for $1 players in range (incl $2 in queue)." },
-		{ SOTA_MSG_OnDKPSubtract			, 1, "$d DKP was subtracted from $b" },
-		{ SOTA_MSG_OnDKPSubtractRaid		, 1, "$d DKP was subtracted from all players in raid" },
-		{ SOTA_MSG_OnDKPPercent				, 1, "$1 % ($d DKP) was subtracted from $b" },
-		{ SOTA_MSG_OnDKPShared				, 1, "$1 DKP was shared ($d DKP per player)" },
-		{ SOTA_MSG_OnDKPSharedQueue 		, 1, "$1 DKP was shared ($d DKP per player plus $2 in queue)" },
-		{ SOTA_MSG_OnDKPSharedRange 		, 1, "$1 DKP was shared for $2 players in range ($d DKP per player)" },
-		{ SOTA_MSG_OnDKPSharedRangeQ		, 1, "$1 DKP was shared for $2 players in range ($d DKP per player, incl $3 in queue)" },
-		{ SOTA_MSG_OnDKPReplaced			, 1, "$1 was replaced with $2 ($d DKP)" }
+		{ SOTA_MSG_OnOpen					, 1, "Начинается аукцион на $i. Минимальная ставка: $d ДКП." },
+		{ SOTA_MSG_OnAnnounceBid			, 2, "Для совершения ставки по МС напишите /w $s bid <ваша ставка>" },
+		{ SOTA_MSG_OnAnnounceMinBid			, 2, "Для совершения ставки по ОС напишите /w $s os <ваша ставка>" },
+		{ SOTA_MSG_ExtraInfo				, 2, "Если есть ставка на МС, ставка на ОС не будет принята. Шаг ставки 100 ДКП" },
+		{ SOTA_MSG_On10SecondsLeft			, 0, "Осталось 10 секунд для ставок на $i" },
+		{ SOTA_MSG_On9SecondsLeft			, 0, "9" },
+		{ SOTA_MSG_On8SecondsLeft			, 0, "8" },
+		{ SOTA_MSG_On7SecondsLeft			, 0, "7" },
+		{ SOTA_MSG_On6SecondsLeft			, 0, "6" },
+		{ SOTA_MSG_On5SecondsLeft			, 0, "5" },
+		{ SOTA_MSG_On4SecondsLeft			, 0, "4" },
+		{ SOTA_MSG_On3SecondsLeft			, 0, "3" },
+		{ SOTA_MSG_On2SecondsLeft			, 0, "2" },
+		{ SOTA_MSG_On1SecondLeft			, 0, "1" },
+		{ SOTA_MSG_OnMainspecBid			, 1, "$b поставил $d ДКП" },
+		{ SOTA_MSG_OnOffspecBid				, 1, "$b поставил $d ДКП на офф-спек" },
+		{ SOTA_MSG_OnMainspecMaxBid			, 1, "$b поставил $d ДКП на $i! Квартира залита!" },
+		{ SOTA_MSG_OnOffspecMaxBid			, 1, "$b поставил $d ДКП на $i по офф-спеку! Квартира залита!" },
+		{ SOTA_MSG_OnComplete				, 2, "$b выиграл аукцион на $i за $d ДКП. Легенда!" },
+		{ SOTA_MSG_OnPause					, 2, "Аукцион на $i приостановлен" },
+		{ SOTA_MSG_OnResume					, 2, "Аукцион на $i возобновлен" },
+		{ SOTA_MSG_OnClose					, 1, "Аукцион на $i завершен" },
+		{ SOTA_MSG_OnBidCancel				, 1, "Ставка $b была отменена, наивысшая ставка теперь $m" },
+		{ SOTA_MSG_OnCancel					, 1, "Аукцион на $i был отменен" },
+		{ SOTA_MSG_OnDKPAdded				, 1, "$d ДКП было добавлено $b" },
+		{ SOTA_MSG_OnDKPAddedRaid			, 1, "$d ДКП было добавлено всем участникам рейда за убийство $1" },
+		{ SOTA_MSG_OnDKPAddedRaidAttendance	, 1, "$d ДКП было добавлено всем участникам рейда за приход в $1. ГОЙДА!" },
+		{ SOTA_MSG_OnDKPAddedRaidNoWipes	, 1, "$d ДКП было добавлено всем участникам рейда за завершение рейда без вайпов. Лучшие" },
+		{ SOTA_MSG_OnDKPAddedRange			, 1, "$d ДКП было добавлено $1 игрокам в радиусе." },
+		{ SOTA_MSG_OnDKPAddedQueue			, 1, "$d ДКП было добавлено $1 игрокам в радиусе (включая $2 в очереди)." },
+		{ SOTA_MSG_OnDKPSubtract			, 1, "$d ДКП было снято с $b" },
+		{ SOTA_MSG_OnDKPSubtractRaid		, 1, "$d ДКП было снято всем участникам рейда" },
+		{ SOTA_MSG_OnDKPPercent				, 1, "$1 % ($d ДКП) было снято с $b" },
+		{ SOTA_MSG_OnDKPShared				, 1, "$1 ДКП было распределено ($d ДКП на игрока)" },
+		{ SOTA_MSG_OnDKPSharedQueue 		, 1, "$1 ДКП было распределено ($d ДКП на игрока плюс $2 в очереди)" },
+		{ SOTA_MSG_OnDKPSharedRange 		, 1, "$1 ДКП было распределено между $2 игроками в радиусе ($d ДКП на игрока)" },
+		{ SOTA_MSG_OnDKPSharedRangeQ		, 1, "$1 ДКП было распределено между $2 игроками в радиусе ($d ДКП на игрока, включая $3 в очереди)" },
+		{ SOTA_MSG_OnDKPReplaced			, 1, "$1 был заменен на $2 ($d ДКП)" }
 	}
 
 	-- Merge default messages into saved messages; in case we added some new event names.
+	if not SOTA_GetConfigurableTextMessages then
+		return;
+	end
+	
 	local messages = SOTA_GetConfigurableTextMessages();
+	-- Если messages nil или пустая таблица - устанавливаем дефолтные значения
 	if not messages or table.getn(messages) == 0 then
-		SOTA_SetConfigurableTextMessages(defaultMessages);
+		-- Клонируем дефолтные сообщения
+		local clonedMessages = { };
+		for n=1, table.getn(defaultMessages), 1 do
+			clonedMessages[n] = { defaultMessages[n][1], defaultMessages[n][2], defaultMessages[n][3] };
+		end
+		SOTA_SetConfigurableTextMessages(clonedMessages);
 		return;
 	end;
 
@@ -446,7 +993,6 @@ function SOTA_HandleCheckbox(checkbox)
 		end
 		return;
 	end
-
 	
 	--	Store DKP in Public Notes:		
 	if checkboxname == "FrameConfigMiscDkpPublicNotes" then
@@ -459,52 +1005,39 @@ function SOTA_HandleCheckbox(checkbox)
 	end
 	
 	if checkbox:GetChecked() then		
-		--	Bid type:
-		--	If checked, then we need to uncheck others in same group:
+		--	Bid type: Только 3 стратегии (0, 1, 2)
 		if checkboxname == "FrameConfigMiscDkpMinBidStrategy0" then
 			getglobal("FrameConfigMiscDkpMinBidStrategy1"):SetChecked(0);
 			getglobal("FrameConfigMiscDkpMinBidStrategy2"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy3"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy4"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy5"):SetChecked(0);
 			SOTA_CONFIG_MinimumBidStrategy = 0;
-		elseif checkboxname == "FrameConfigBossDkpMinBidStrategy1" then
+		elseif checkboxname == "FrameConfigMiscDkpMinBidStrategy1" then
 			getglobal("FrameConfigMiscDkpMinBidStrategy0"):SetChecked(0);
 			getglobal("FrameConfigMiscDkpMinBidStrategy2"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy3"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy4"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy5"):SetChecked(0);
 			SOTA_CONFIG_MinimumBidStrategy = 1;
 		elseif checkboxname == "FrameConfigMiscDkpMinBidStrategy2" then
 			getglobal("FrameConfigMiscDkpMinBidStrategy0"):SetChecked(0);
 			getglobal("FrameConfigMiscDkpMinBidStrategy1"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy3"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy4"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy5"):SetChecked(0);
 			SOTA_CONFIG_MinimumBidStrategy = 2;
-		elseif checkboxname == "FrameConfigMiscDkpMinBidStrategy3" then
-			getglobal("FrameConfigMiscDkpMinBidStrategy0"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy1"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy2"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy4"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy5"):SetChecked(0);
-			SOTA_CONFIG_MinimumBidStrategy = 3;			
-		elseif checkboxname == "FrameConfigMiscDkpMinBidStrategy4" then
-			getglobal("FrameConfigMiscDkpMinBidStrategy0"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy1"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy2"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy3"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy5"):SetChecked(0);
-			SOTA_CONFIG_MinimumBidStrategy = 4;
-		elseif checkboxname == "FrameConfigMiscDkpMinBidStrategy5" then
-			getglobal("FrameConfigMiscDkpMinBidStrategy0"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy1"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy2"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy3"):SetChecked(0);
-			getglobal("FrameConfigMiscDkpMinBidStrategy4"):SetChecked(0);
-			SOTA_CONFIG_MinimumBidStrategy = 5;
 		end
 	end
+end
+
+--[[
+--	Сохранить настройки Bidding
+--]]
+function SOTA_SaveBiddingSettings()
+	-- Настройки уже сохраняются автоматически при изменении через SOTA_HandleCheckbox и слайдеры
+	-- Эта функция просто подтверждает сохранение
+	localEcho("Настройки Bidding сохранены!");
+end
+
+--[[
+--	Сохранить настройки Misc DKP
+--]]
+function SOTA_SaveMiscDKPSettings()
+	-- Настройки уже сохраняются автоматически при изменении через SOTA_HandleCheckbox и слайдеры
+	-- Эта функция просто подтверждает сохранение
+	localEcho("Настройки Misc DKP сохранены!");
 end
 
 
@@ -622,8 +1155,17 @@ end;
 
 function SOTA_RefreshVisibleTextList(offset)
 	--echo(string.format("Offset=%d", offset));
+	if not SOTA_GetConfigurableTextMessages then
+		return;
+	end
+	
 	local messages = SOTA_GetConfigurableTextMessages();
 	local msgInfo;
+	
+	-- Проверяем, что messages не nil
+	if not messages then
+		messages = { };
+	end
 
 	for n=1, SOTA_MAX_MESSAGES, 1 do
 		msgInfo = messages[n + offset]
@@ -653,9 +1195,22 @@ end
 
 function SOTA_UpdateTextList(frame)
 --	FauxScrollFrame_Update(FrameConfigMessageTableList, SOTA_MAX_MESSAGES, 10, 20);
+	-- Сначала убеждаемся, что сообщения инициализированы
+	if SOTA_VerifyEventMessages then
+		SOTA_VerifyEventMessages();
+	end
+	
+	if not SOTA_GetConfigurableTextMessages then
+		return;
+	end
+	
+	-- Затем получаем актуальные сообщения
 	local messages = SOTA_GetConfigurableTextMessages();
-
-	SOTA_VerifyEventMessages();
+	
+	-- Проверяем, что messages не nil
+	if not messages then
+		messages = { };
+	end
 
 	FauxScrollFrame_Update(FrameConfigMessageTableList, table.getn(messages), SOTA_MAX_MESSAGES, 20);
 	local offset = FauxScrollFrame_GetOffset(FrameConfigMessageTableList);
@@ -674,3 +1229,8 @@ function SOTA_InitializeTextElements()
 	end
 end
 
+-- Инициализация при загрузке файла
+-- Убеждаемся, что сообщения инициализированы сразу после загрузки
+if not SOTA_CONFIG_Messages or (type(SOTA_CONFIG_Messages) == "table" and table.getn(SOTA_CONFIG_Messages) == 0) then
+	SOTA_VerifyEventMessages();
+end
