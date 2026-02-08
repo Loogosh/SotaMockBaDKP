@@ -20,13 +20,21 @@ end
 
 
 function SOTA_GetEventText(eventName)
+	if not SOTA_GetConfigurableTextMessages then
+		return nil;
+	end
+	
 	local messages = SOTA_GetConfigurableTextMessages();
 	
 	-- Проверяем, что messages не nil и является таблицей
 	if not messages or table.getn(messages) == 0 then
 		-- Если сообщения не инициализированы, инициализируем их
-		SOTA_VerifyEventMessages();
-		messages = SOTA_GetConfigurableTextMessages();
+		if SOTA_VerifyEventMessages then
+			SOTA_VerifyEventMessages();
+		end
+		if SOTA_GetConfigurableTextMessages then
+			messages = SOTA_GetConfigurableTextMessages();
+		end
 		-- Если все еще nil или пусто, возвращаем nil
 		if not messages or table.getn(messages) == 0 then
 			return nil;
@@ -91,6 +99,10 @@ end;
 
 function SOTA_SetConfigurableMessage(event, channel, message)
 	--echo("Saving new message: Event: "..event..", Channel: "..channel..", Message: "..message);
+	if not SOTA_GetConfigurableTextMessages then
+		return;
+	end
+	
 	local messages = SOTA_GetConfigurableTextMessages();
 	
 	-- Проверяем, что messages не nil
@@ -290,22 +302,74 @@ end
 
 function SOTA_RefreshBossDKPValues()
 	local frame;
+	local value;
+	local valueString;
+	local textFrame;
+	
 	frame = getglobal("FrameConfigBossDkp_20Mans");
-	if frame then frame:SetValue(SOTA_GetBossDKPValue("20Mans")); end
+	if frame then 
+		value = SOTA_GetBossDKPValue("20Mans");
+		frame:SetValue(value);
+		valueString = string.format("20 mans (ZG, AQ20): %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_20MansText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
 	frame = getglobal("FrameConfigBossDkp_MoltenCore");
-	if frame then frame:SetValue(SOTA_GetBossDKPValue("MoltenCore")); end
+	if frame then 
+		value = SOTA_GetBossDKPValue("MoltenCore");
+		frame:SetValue(value);
+		valueString = string.format("Molten Core: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_MoltenCoreText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
 	frame = getglobal("FrameConfigBossDkp_Onyxia");
-	if frame then frame:SetValue(SOTA_GetBossDKPValue("Onyxia")); end
+	if frame then 
+		value = SOTA_GetBossDKPValue("Onyxia");
+		frame:SetValue(value);
+		valueString = string.format("Onyxia: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_OnyxiaText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
 	frame = getglobal("FrameConfigBossDkp_BlackwingLair");
-	if frame then frame:SetValue(SOTA_GetBossDKPValue("BlackwingLair")); end
+	if frame then 
+		value = SOTA_GetBossDKPValue("BlackwingLair");
+		frame:SetValue(value);
+		valueString = string.format("Blackwing Lair: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_BlackwingLairText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
 	frame = getglobal("FrameConfigBossDkp_AQ40");
-	if frame then frame:SetValue(SOTA_GetBossDKPValue("AQ40")); end
+	if frame then 
+		value = SOTA_GetBossDKPValue("AQ40");
+		frame:SetValue(value);
+		valueString = string.format("Temple of Ahn'Qiraj: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_AQ40Text");
+		if textFrame then textFrame:SetText(valueString); end
+	end
 	frame = getglobal("FrameConfigBossDkp_Naxxramas");
-	if frame then frame:SetValue(SOTA_GetBossDKPValue("Naxxramas")); end
+	if frame then 
+		value = SOTA_GetBossDKPValue("Naxxramas");
+		frame:SetValue(value);
+		valueString = string.format("Naxxramas: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_NaxxramasText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
 	frame = getglobal("FrameConfigBossDkp_UpperKarazhan");
-	if frame then frame:SetValue(SOTA_GetBossDKPValue("UpperKarazhan")); end
+	if frame then 
+		value = SOTA_GetBossDKPValue("UpperKarazhan");
+		frame:SetValue(value);
+		valueString = string.format("Upper Karazhan: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_UpperKarazhanText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
 	frame = getglobal("FrameConfigBossDkp_WorldBosses");
-	if frame then frame:SetValue(SOTA_GetBossDKPValue("WorldBosses")); end
+	if frame then 
+		value = SOTA_GetBossDKPValue("WorldBosses");
+		frame:SetValue(value);
+		valueString = string.format("World Bosses: %d DKP", value);
+		textFrame = getglobal("FrameConfigBossDkp_WorldBossesText");
+		if textFrame then textFrame:SetText(valueString); end
+	end
 end
 
 function SOTA_RefreshItemDKPValues()
@@ -400,6 +464,10 @@ end
 
 function SOTA_SaveItemDKPValues()
 	-- Сохраняем значения из EditBox'ов в конфиг
+	if not SOTA_GetItemDKPList or not SOTA_SetBossDKPValue then
+		return;
+	end
+	
 	local itemList = SOTA_GetItemDKPList();
 	if not itemList or table.getn(itemList) == 0 then
 		return;
@@ -516,6 +584,10 @@ function SOTA_OnOptionBossDKPChanged(object)
 	
 	local valueString = "";
 	
+	if not SOTA_SetBossDKPValue then
+		return;
+	end
+	
 	if sliderName == "FrameConfigBossDkp_20Mans" then
 		SOTA_SetBossDKPValue("20Mans", value);
 		valueString = string.format("20 mans (ZG, AQ20): %d DKP", value);
@@ -556,45 +628,159 @@ function SOTA_InitializeConfigSettings()
 	-- Поэтому здесь мы проверяем только те переменные, которые могут быть nil:
 	-- Используем == nil, а не "if not", чтобы не перезаписывать сохраненные 0 значения
 	
+	local loadedFromSaved = 0;
+	local createdDefaults = 0;
+	local savedVarsStatus = {};
+	
 	-- Pane 3: Misc DKP - проверяем на nil (если не загружено из SavedVariables)
 	if SOTA_CONFIG_UseGuildNotes == nil then
 		SOTA_CONFIG_UseGuildNotes = 0;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_UseGuildNotes"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_UseGuildNotes"] = "загружено из SavedVariables";
 	end
 	if SOTA_CONFIG_MinimumBidStrategy == nil then
 		SOTA_CONFIG_MinimumBidStrategy = 1;  -- По умолчанию: Минимальное увеличение на 100 ДКП
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_MinimumBidStrategy"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_MinimumBidStrategy"] = "загружено из SavedVariables";
 	end
 	if SOTA_CONFIG_DKPStringLength == nil then
 		SOTA_CONFIG_DKPStringLength = 5;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_DKPStringLength"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_DKPStringLength"] = "загружено из SavedVariables";
 	end
 	if SOTA_CONFIG_MinimumDKPPenalty == nil then
 		SOTA_CONFIG_MinimumDKPPenalty = 50;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_MinimumDKPPenalty"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_MinimumDKPPenalty"] = "загружено из SavedVariables";
 	end
 
 	-- Pane 1: Основные настройки - проверяем на nil
 	-- Эти переменные уже инициализированы в sota-core.lua, но проверяем на всякий случай
 	if SOTA_CONFIG_EnableOSBidding == nil then
 		SOTA_CONFIG_EnableOSBidding = 1;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_EnableOSBidding"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_EnableOSBidding"] = "загружено из SavedVariables";
 	end
 	if SOTA_CONFIG_EnableZoneCheck == nil then
 		SOTA_CONFIG_EnableZoneCheck = 1;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_EnableZoneCheck"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_EnableZoneCheck"] = "загружено из SavedVariables";
 	end
 	if SOTA_CONFIG_EnableOnlineCheck == nil then
 		SOTA_CONFIG_EnableOnlineCheck = 1;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_EnableOnlineCheck"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_EnableOnlineCheck"] = "загружено из SavedVariables";
 	end
 	if SOTA_CONFIG_AllowPlayerPass == nil then
-		SOTA_CONFIG_AllowPlayerPass = 1;
+		SOTA_CONFIG_AllowPlayerPass = 0;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_AllowPlayerPass"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_AllowPlayerPass"] = "загружено из SavedVariables";
 	end
 	if SOTA_CONFIG_DisableDashboard == nil then
 		SOTA_CONFIG_DisableDashboard = 0;  -- Исправлено: должно быть 0, а не 1
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_DisableDashboard"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_DisableDashboard"] = "загружено из SavedVariables";
 	end
 	if SOTA_CONFIG_OutputChannel == nil then
 		SOTA_CONFIG_OutputChannel = WARN_CHANNEL;
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_OutputChannel"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_OutputChannel"] = "загружено из SavedVariables";
 	end
 	if SOTA_CONFIG_Messages == nil then
 		SOTA_CONFIG_Messages = { };
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_Messages"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_Messages"] = "загружено из SavedVariables";
 	end
 	if SOTA_HISTORY_DKP == nil then
 		SOTA_HISTORY_DKP = { };
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_HISTORY_DKP"] = "создано по умолчанию";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_HISTORY_DKP"] = "загружено из SavedVariables";
+	end
+	
+	-- Проверяем AuctionTime и AuctionExtension (из SOTA.toc)
+	-- Эти переменные инициализированы в sota-core.lua, поэтому они не будут nil
+	-- WoW загружает SavedVariables ПЕРЕД выполнением кода, поэтому если они были сохранены,
+	-- они будут иметь сохраненное значение, иначе - дефолтное из sota-core.lua
+	-- Мы не можем точно определить, были ли они загружены, поэтому считаем их загруженными
+	-- (это нормально, так как они всегда имеют значение)
+	loadedFromSaved = loadedFromSaved + 1;
+	savedVarsStatus["SOTA_CONFIG_AuctionTime"] = "инициализировано (дефолт или из SavedVariables)";
+	loadedFromSaved = loadedFromSaved + 1;
+	savedVarsStatus["SOTA_CONFIG_AuctionExtension"] = "инициализировано (дефолт или из SavedVariables)";
+	
+	-- Проверяем VersionNumber и VersionDate (из SOTA.toc)
+	if SOTA_CONFIG_VersionNumber == nil then
+		SOTA_CONFIG_VersionNumber = nil;  -- Может быть nil
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_VersionNumber"] = "создано по умолчанию (nil)";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_VersionNumber"] = "загружено из SavedVariables";
+	end
+	if SOTA_CONFIG_VersionDate == nil then
+		SOTA_CONFIG_VersionDate = nil;  -- Может быть nil
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_VersionDate"] = "создано по умолчанию (nil)";
+	else
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_VersionDate"] = "загружено из SavedVariables";
+	end
+	
+	-- Проверяем таблицы BossDKP и ItemDKP
+	local bossDkpLoaded = false;
+	if SOTA_CONFIG_BossDKP and type(SOTA_CONFIG_BossDKP) == "table" and table.getn(SOTA_CONFIG_BossDKP) > 0 then
+		bossDkpLoaded = true;
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_BossDKP"] = "загружено из SavedVariables";
+	else
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_BossDKP"] = "создано по умолчанию";
+	end
+	
+	local itemDkpLoaded = false;
+	if SOTA_CONFIG_ItemDKP and type(SOTA_CONFIG_ItemDKP) == "table" and table.getn(SOTA_CONFIG_ItemDKP) > 0 then
+		itemDkpLoaded = true;
+		loadedFromSaved = loadedFromSaved + 1;
+		savedVarsStatus["SOTA_CONFIG_ItemDKP"] = "загружено из SavedVariables";
+	else
+		createdDefaults = createdDefaults + 1;
+		savedVarsStatus["SOTA_CONFIG_ItemDKP"] = "создано по умолчанию";
 	end
 	
 	-- Инициализируем Boss DKP дефолтными значениями, если таблица пустая или не существует
@@ -638,6 +824,34 @@ function SOTA_InitializeConfigSettings()
 	SOTA_RefreshBossDKPValues();
 
 	SOTA_VerifyEventMessages();
+	
+	-- Выводим диагностическую информацию
+	echo(SOTA_COLOUR_CHAT .. "========================================");
+	localEcho(string.format("Настройки загружены. Загружено из SavedVariables: %d, создано по умолчанию: %d", loadedFromSaved, createdDefaults));
+	echo(SOTA_COLOUR_CHAT .. "========================================");
+	
+	-- Если много переменных создано по умолчанию, предупреждаем о возможной проблеме
+	if createdDefaults > 8 then
+		localEcho("SOTA: ВНИМАНИЕ! Большинство настроек создано по умолчанию. Возможные причины:");
+		localEcho("  1. Проверьте файл SOTA.toc - список ## SavedVariables должен быть правильным");
+		localEcho("  2. Проверьте файл SOTA.lua в папке WTF\\Account\\<ваш_аккаунт>\\SavedVariables\\");
+		localEcho("  3. Убедитесь, что в SOTA.toc нет опечаток в именах переменных (проверьте запятые)");
+		localEcho("  4. Если файл SOTA.lua существует, проверьте его синтаксис на ошибки");
+		localEcho("  5. Убедитесь, что имена переменных в SOTA.toc точно совпадают с именами в коде");
+		localEcho("SOTA: Детали инициализации переменных (созданные по умолчанию):");
+		for varName, status in pairs(savedVarsStatus) do
+			if string.find(status, "создано по умолчанию") then
+				localEcho(string.format("  - %s: %s", varName, status));
+			end
+		end
+	elseif createdDefaults > 0 then
+		localEcho("SOTA: Некоторые настройки созданы по умолчанию (это нормально при первом запуске):");
+		for varName, status in pairs(savedVarsStatus) do
+			if string.find(status, "создано по умолчанию") then
+				localEcho(string.format("  - %s", varName));
+			end
+		end
+	end
 end
 
 
@@ -687,6 +901,10 @@ function SOTA_VerifyEventMessages()
 	}
 
 	-- Merge default messages into saved messages; in case we added some new event names.
+	if not SOTA_GetConfigurableTextMessages then
+		return;
+	end
+	
 	local messages = SOTA_GetConfigurableTextMessages();
 	-- Если messages nil или пустая таблица - устанавливаем дефолтные значения
 	if not messages or table.getn(messages) == 0 then
@@ -773,27 +991,6 @@ function SOTA_HandleCheckbox(checkbox)
 		end
 		return;
 	end
-end
-
---[[
---	Сохранить настройки Bidding
---]]
-function SOTA_SaveBiddingSettings()
-	-- Настройки уже сохраняются автоматически при изменении через SOTA_HandleCheckbox и слайдеры
-	-- Эта функция просто подтверждает сохранение
-	localEcho("Настройки Bidding сохранены!");
-end
-
---[[
---	Сохранить настройки Misc DKP
---]]
-function SOTA_SaveMiscDKPSettings()
-	-- Настройки уже сохраняются автоматически при изменении через SOTA_HandleCheckbox и слайдеры
-	-- Эта функция просто подтверждает сохранение
-	localEcho("Настройки Misc DKP сохранены!");
-		return;
-	end
-
 	
 	--	Store DKP in Public Notes:		
 	if checkboxname == "FrameConfigMiscDkpPublicNotes" then
@@ -821,6 +1018,24 @@ function SOTA_SaveMiscDKPSettings()
 			SOTA_CONFIG_MinimumBidStrategy = 2;
 		end
 	end
+end
+
+--[[
+--	Сохранить настройки Bidding
+--]]
+function SOTA_SaveBiddingSettings()
+	-- Настройки уже сохраняются автоматически при изменении через SOTA_HandleCheckbox и слайдеры
+	-- Эта функция просто подтверждает сохранение
+	localEcho("Настройки Bidding сохранены!");
+end
+
+--[[
+--	Сохранить настройки Misc DKP
+--]]
+function SOTA_SaveMiscDKPSettings()
+	-- Настройки уже сохраняются автоматически при изменении через SOTA_HandleCheckbox и слайдеры
+	-- Эта функция просто подтверждает сохранение
+	localEcho("Настройки Misc DKP сохранены!");
 end
 
 
@@ -938,6 +1153,10 @@ end;
 
 function SOTA_RefreshVisibleTextList(offset)
 	--echo(string.format("Offset=%d", offset));
+	if not SOTA_GetConfigurableTextMessages then
+		return;
+	end
+	
 	local messages = SOTA_GetConfigurableTextMessages();
 	local msgInfo;
 	
@@ -975,7 +1194,13 @@ end
 function SOTA_UpdateTextList(frame)
 --	FauxScrollFrame_Update(FrameConfigMessageTableList, SOTA_MAX_MESSAGES, 10, 20);
 	-- Сначала убеждаемся, что сообщения инициализированы
-	SOTA_VerifyEventMessages();
+	if SOTA_VerifyEventMessages then
+		SOTA_VerifyEventMessages();
+	end
+	
+	if not SOTA_GetConfigurableTextMessages then
+		return;
+	end
 	
 	-- Затем получаем актуальные сообщения
 	local messages = SOTA_GetConfigurableTextMessages();

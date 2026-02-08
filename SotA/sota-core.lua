@@ -125,7 +125,7 @@ SOTA_CONFIG_AuctionExtension	= 8
 SOTA_CONFIG_EnableOSBidding		= 1;	-- Enable MS bidding over OS
 SOTA_CONFIG_EnableZoneCheck		= 1;	-- Enable zone check when doing raid queue DKP
 SOTA_CONFIG_EnableOnlineCheck	= 1;	-- Enable online check when doing raid queue DKP
-SOTA_CONFIG_AllowPlayerPass     = 1;	-- 0: No pass, 1: can pass latest bid
+SOTA_CONFIG_AllowPlayerPass     = 0;	-- 0: No pass, 1: can pass latest bid
 SOTA_CONFIG_DisableDashboard	= 0;	-- Disable Dashboard in UI (hide it)
 SOTA_CONFIG_OutputChannel		= WARN_CHANNEL;
 SOTA_CONFIG_Messages			= nil;	-- Contains configurable raid messages (if any) - будет инициализировано в SOTA_VerifyEventMessages()
@@ -198,35 +198,27 @@ end
 
 --[[
 --	Echo event message (wrapper for configurable messages)
+--	Вернута упрощённая логика, как в оригинале: берём текст события и шлём его в publicEcho.
+--	Если система сообщений ещё не инициализирована, просто пытаемся подкинуть дефолты и тихо выходим.
 --]]
 function SOTA_EchoEvent(msgKey, item, dkp, bidder, rank, param1, param2, param3)
-	-- Пытаемся инициализировать сообщения, если они не инициализированы
-	if not SOTA_CONFIG_Messages or (type(SOTA_CONFIG_Messages) == "table" and table.getn(SOTA_CONFIG_Messages) == 0) then
+	-- Если по какой‑то причине опции ещё не загрузились, просто выходим без спама в чат
+	if not SOTA_getConfigurableMessage then
+		return;
+	end
+
+	-- На всякий случай убеждаемся, что таблица сообщений инициализирована
+	if not SOTA_CONFIG_Messages
+		or type(SOTA_CONFIG_Messages) ~= "table"
+		or table.getn(SOTA_CONFIG_Messages) == 0 then
 		if SOTA_VerifyEventMessages then
 			SOTA_VerifyEventMessages();
 		end
 	end
-	
-	if SOTA_getConfigurableMessage then
-		local msgInfo = SOTA_getConfigurableMessage(msgKey, item, dkp, bidder, rank, param1, param2, param3);
-		if msgInfo then
-			publicEcho(msgInfo);
-		end
-	else
-		-- Fallback if options not loaded yet - пытаемся инициализировать еще раз
-		if SOTA_VerifyEventMessages then
-			SOTA_VerifyEventMessages();
-			-- Пытаемся еще раз после инициализации
-			if SOTA_getConfigurableMessage then
-				local msgInfo = SOTA_getConfigurableMessage(msgKey, item, dkp, bidder, rank, param1, param2, param3);
-				if msgInfo then
-					publicEcho(msgInfo);
-					return;
-				end
-			end
-		end
-		-- Если все еще не работает, выводим ошибку
-		localEcho("SOTA: Message system not initialized");
+
+	local msgInfo = SOTA_getConfigurableMessage(msgKey, item, dkp, bidder, rank, param1, param2, param3);
+	if msgInfo then
+		publicEcho(msgInfo);
 	end
 end
 
@@ -2133,7 +2125,7 @@ function SOTA_ResetAllSettingsToDefault()
 	SOTA_CONFIG_EnableOSBidding = 1;
 	SOTA_CONFIG_EnableZoneCheck = 1;
 	SOTA_CONFIG_EnableOnlineCheck = 1;
-	SOTA_CONFIG_AllowPlayerPass = 1;
+	SOTA_CONFIG_AllowPlayerPass = 0;
 	SOTA_CONFIG_DisableDashboard = 0;
 	SOTA_CONFIG_OutputChannel = WARN_CHANNEL;
 	

@@ -1691,7 +1691,12 @@ end
 
 function SOTA_OnEvent(event, arg1, arg2, arg3, arg4, arg5)
 	if (event == "ADDON_LOADED") then
-		if arg1 == SOTA_TITLE then
+		-- arg1 в ADDON_LOADED - это имя папки аддона (из .toc файла), обычно "SOTA"
+		-- Проверяем оба варианта на всякий случай
+		if arg1 == "SOTA" or arg1 == SOTA_TITLE or arg1 == "SotA" then
+			echo(SOTA_COLOUR_CHAT .. "========================================");
+			localEcho("Аддон инициализирован. Загружаю настройки...");
+			echo(SOTA_COLOUR_CHAT .. "========================================");
 		    SOTA_InitializeConfigSettings();
 		end
 	elseif (event == "CHAT_MSG_GUILD") then
@@ -1710,7 +1715,9 @@ function SOTA_OnEvent(event, arg1, arg2, arg3, arg4, arg5)
 end
 
 function SOTA_OnLoad()
+	echo(SOTA_COLOUR_CHAT .. "========================================");
 	localEcho(string.format("Loot Distribution Addon version %s by %s", GetAddOnMetadata("SOTA", "Version"), GetAddOnMetadata("SOTA", "Author")));
+	echo(SOTA_COLOUR_CHAT .. "========================================");
     
 	this:RegisterEvent("ADDON_LOADED");
 	this:RegisterEvent("GUILD_ROSTER_UPDATE");
