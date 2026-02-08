@@ -825,6 +825,7 @@ function SOTA_InitializeConfigSettings()
 
 	SOTA_VerifyEventMessages();
 	
+	--[[ Отладочные сообщения о загрузке настроек
 	-- Выводим диагностическую информацию
 	echo(SOTA_COLOUR_CHAT .. "========================================");
 	localEcho(string.format("Настройки загружены. Загружено из SavedVariables: %d, создано по умолчанию: %d", loadedFromSaved, createdDefaults));
@@ -852,6 +853,7 @@ function SOTA_InitializeConfigSettings()
 			end
 		end
 	end
+	--]]
 end
 
 

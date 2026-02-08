@@ -55,6 +55,7 @@ function SOTA_StartAuction(msg)
 
 	AuctionedItemMsg = msg;
 	
+	-- Парсим сообщение: ищем число в начале (минимальный бид) и itemlink
 	local t={}; 
 	local i=1;
     for w in string.gfind(msg, "%S+") do
@@ -62,7 +63,13 @@ function SOTA_StartAuction(msg)
         i = i + 1
     end
 	
+	-- Проверяем, является ли первый элемент числом (минимальный бид)
+	-- Если нет, значит сумма не указана, используем дефолт 100 ДКП
 	SOTA_Minimum_Bid = tonumber(t[1]);
+	if not SOTA_Minimum_Bid then
+		-- Если первый элемент не число, значит это itemlink, сумма не указана
+		SOTA_Minimum_Bid = 100;
+	end
 
 	local _, _, itemId = string.find(msg, "item:(%d+):")
 	if not itemId then

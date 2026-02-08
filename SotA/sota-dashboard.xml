@@ -4,7 +4,7 @@
 	<!-- SotA Dashboard -->
 	<Frame name="DashboardUIFrame" parent="UIParent" toplevel="true" hidden="true">
 		<Size>
-			<AbsDimension x="296" y="80" />
+			<AbsDimension x="368" y="80" />
 		</Size>
 		<Anchors>
 			<Anchor point="TOPLEFT">
@@ -15,7 +15,7 @@
 			<!-- Current item frame -->
 			<Frame name="$parentItem">
 				<Size>
-					<AbsDimension x="296" y="40" />
+					<AbsDimension x="368" y="40" />
 				</Size>
 				<Anchors>
 					<Anchor point="TOPLEFT">
