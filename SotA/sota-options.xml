@@ -471,22 +471,6 @@
 					</OnClick>
 				</Scripts>
 			</CheckButton>
-			<!-- Save Button -->
-			<Button name="$parentSaveButton" inherits="UIPanelButtonTemplate" text="Сохранить">
-				<Size>
-					<AbsDimension x="100" y="25" />
-				</Size>
-				<Anchors>
-					<Anchor point="BOTTOM">
-						<Offset x="0" y="20" />
-					</Anchor>
-				</Anchors>
-				<Scripts>
-					<OnClick>
-						SOTA_SaveBiddingSettings();
-					</OnClick>
-				</Scripts>
-			</Button>
 		</Frames>
 	</Frame>
 	
@@ -922,22 +906,6 @@
 					</OnValueChanged>
 				</Scripts>
 			</Slider>
-			<!-- Save Button -->
-			<Button name="$parentSaveButton" inherits="UIPanelButtonTemplate" text="Сохранить">
-				<Size>
-					<AbsDimension x="100" y="25" />
-				</Size>
-				<Anchors>
-					<Anchor point="BOTTOM">
-						<Offset x="0" y="20" />
-					</Anchor>
-				</Anchors>
-				<Scripts>
-					<OnClick>
-						SOTA_SaveMiscDKPSettings();
-					</OnClick>
-				</Scripts>
-			</Button>
 		</Frames>
 	</Frame>
 
