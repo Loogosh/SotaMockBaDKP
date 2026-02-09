@@ -131,6 +131,7 @@ SOTA_CONFIG_OutputChannel		= WARN_CHANNEL;
 SOTA_CONFIG_Messages			= nil;	-- Contains configurable raid messages (if any) - будет инициализировано в SOTA_VerifyEventMessages()
 	SOTA_CONFIG_VersionNumber		= nil;	-- Increases for every change!
 	SOTA_CONFIG_VersionDate			= nil;	-- Date of last change!
+SOTA_CONFIG_LastAddRaidDKP		= 100;	-- Last DKP value used in "Add raid DKP" popup (default 100)
 -- SOTA_CONFIG_MinBid				= 100;
 
 --[[

@@ -345,6 +345,9 @@ Force player to become Master (if he is raid leader or assistant)
 /sota help
 Show HELP page (more or less this page!)
 
+/sota zone
+Show current zone name and its DKP type (Public/Officer mapping used by the addon).
+
 
 
 5. Miscellaneous
