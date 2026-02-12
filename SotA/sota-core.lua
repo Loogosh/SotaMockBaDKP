@@ -2075,10 +2075,8 @@ end
 --	bidtype 2 = OS
 --]]
 function SOTA_GetMinimumBid(bidtype)
-	local minimumBid = SOTA_GetStartingDKP();
-	if minimumBid == 0 then
-		minimumBid = SOTA_Minimum_Bid;
-	end
+	-- Минимальная ставка первой ставки всегда из аукциона: MS = SOTA_Minimum_Bid, OS = половина
+	local minimumBid = (SOTA_Minimum_Bid and SOTA_Minimum_Bid > 0) and SOTA_Minimum_Bid or 100;
 
 	local highestBid = SOTA_GetHighestBid(bidtype);
 	if not highestBid then

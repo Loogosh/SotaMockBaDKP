@@ -246,7 +246,7 @@ function SOTA_HandleSOTACommand(msg)
 		end
 		return;
 	end
-
+	
 	--	Command: zone
 	--	Syntax: "zone"
 	if cmd == "zone" then
