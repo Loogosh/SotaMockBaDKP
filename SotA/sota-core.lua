@@ -46,6 +46,14 @@ local RaidRosterLazyUpdate		= false;
 -- Table of Queued raid members:			{ Name, QueueID, Role, Class, Guild rank, Offline time }
 SOTA_RaidQueue					= { }
 
+--[[
+--	DKP Verification State: проверка записи DKP на сервер.
+--	phase: "idle" | "pending"
+--	targets: { {name, expectedAfter, dkpDelta}, ... }
+--	completionFunc: function() - вызвать при успехе (echo, log)
+--]]
+SOTA_DKPVerifyState				= { phase = "idle", targets = {}, retryCount = 0, maxRetries = 3 }
+
 
 SOTA_CHANNELS = {
 	{ 'Raid Warning (/rw)',			WARN_CHANNEL },
@@ -453,9 +461,67 @@ function SOTA_RequestUpdateGuildRoster()
 	GuildRoster();
 end
 
+--[[
+--	Проверяет, что DKP записался на сервер. Вызывается после GUILD_ROSTER_UPDATE.
+--]]
+function SOTA_DoDKPVerification()
+	local st = SOTA_DKPVerifyState;
+	if st.phase ~= "pending" or not st.targets or table.getn(st.targets) == 0 then
+		st.phase = "idle";
+		return;
+	end
+	
+	local pendingRetry = { };
+	for i = 1, table.getn(st.targets), 1 do
+		local t = st.targets[i];
+		if t then
+			local info = SOTA_GetGuildPlayerInfo(t[1]);
+			local currentDkp = info and (1 * (info[2] or 0)) or nil;
+			local expected = 1 * (t[2] or 0);
+			if currentDkp == nil or currentDkp ~= expected then
+				table.insert(pendingRetry, t);
+			end
+		end
+	end
+	
+	if table.getn(pendingRetry) > 0 and st.retryCount < st.maxRetries then
+		st.retryCount = st.retryCount + 1;
+		for i = 1, table.getn(pendingRetry), 1 do
+			local t = pendingRetry[i];
+			SOTA_ApplyPlayerDKP(t[1], t[3], true);
+		end
+		st.targets = pendingRetry;
+		SOTA_RequestUpdateGuildRoster();
+		return;
+	end
+	
+	if table.getn(pendingRetry) > 0 then
+		for i = 1, table.getn(pendingRetry), 1 do
+			local t = pendingRetry[i];
+			localEcho(string.format("Внимание: DKP для %s не подтверждено после %d попыток.", t[1], st.maxRetries));
+		end
+	end
+	
+	if st.completionFunc then
+		st.completionFunc();
+	end
+	
+	st.phase = "idle";
+	st.targets = { };
+	st.retryCount = 0;
+	st.completionFunc = nil;
+end
+
 function SOTA_OnGuildRosterUpdate()
 	SOTA_RefreshGuildRoster();
 	SOTA_UpdateQueueOfflineTimers();
+
+	if SOTA_DKPVerifyState.phase == "pending" then
+		SOTA_DoDKPVerification();
+		SOTA_RefreshRaidQueue();
+		SOTA_RefreshLogElements();
+		return;
+	end
 
 	if SOTA_CanReadNotes() then
 		if not JobIsRunning then	
@@ -658,13 +724,18 @@ end
 
 function SOTA_SetBossDKPValue(instancename, bossDkp)
 	SOTA_GetBossDKPList();
-	
+
+	-- Обновляем существующее значение, если такой инстанс уже есть
 	for n=1, table.getn(SOTA_CONFIG_BossDKP), 1 do
 		if SOTA_CONFIG_BossDKP[n][1] == instancename then
 			SOTA_CONFIG_BossDKP[n][2] = bossDkp;
-			break;
+			return;
 		end
 	end
+
+	-- Старые SavedVariables могут не содержать новые рейды (например, UpperKarazhan),
+	-- поэтому, если записи нет, просто добавляем её в конец таблицы.
+	table.insert(SOTA_CONFIG_BossDKP, { instancename, bossDkp });
 end
 
 function SOTA_GetBossDKPList()
@@ -953,10 +1024,9 @@ function SOTA_Call_AddRaidDKP(arg)
 	end
 end
 local SOTA_QueuedPlayersImpacted;
-function SOTA_AddRaidDKP(arg, silentmode, callMethod)
+function SOTA_AddRaidDKP(arg, silentmode, callMethod, extraCompletion)
 	SOTA_QueuedPlayersImpacteded = 0;
 	
-	-- Парсим аргумент: "100 BossName" или просто "100"
 	local dkp, boss;
 	local _, _, dkpStr, bossName = string.find(arg, "(%S+)%s+(.+)");
 	
@@ -964,7 +1034,6 @@ function SOTA_AddRaidDKP(arg, silentmode, callMethod)
 		dkp = tonumber(dkpStr);
 		boss = bossName;
 	else
-		-- Только число без имени босса
 		dkp = tonumber(arg);
 		boss = "DKP";
 	end
@@ -974,84 +1043,93 @@ function SOTA_AddRaidDKP(arg, silentmode, callMethod)
 		return false;
 	end
 	
-	if SOTA_IsInRaid(true) then
-		
-		if not callMethod then
-			callMethod = "+Raid";
-		end
-		
-		local tidIndex = 1
-		local tidChanges = { }
-
-		local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
-		local raidRoster = SOTA_GetRaidRoster();
-		for n=1, table.getn(raidRoster), 1 do
-			local playerInfo = raidRoster[n];
-			if playerInfo then
-				-- Проверяем онлайн/офлайн для рейда, если включена проверка
-				if onlinecheck == 1 and playerInfo[5] == 0 then
-					-- Игрок офлайн, пропускаем
-					localEcho(string.format("Пропущен %s (офлайн)", playerInfo[1]));
-				else
-					SOTA_ApplyPlayerDKP(playerInfo[1], dkp);
-					tidChanges[tidIndex] = { playerInfo[1], dkp };
-					tidIndex = tidIndex + 1;
-				end
+	if not SOTA_IsInRaid(true) then
+		return false;
+	end
+	
+	if not callMethod then
+		callMethod = "+Raid";
+	end
+	
+	local tidChanges = { };
+	local targets = { };
+	local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
+	local raidRoster = SOTA_GetRaidRoster();
+	
+	for n=1, table.getn(raidRoster), 1 do
+		local playerInfo = raidRoster[n];
+		if playerInfo then
+			if onlinecheck == 1 and playerInfo[5] == 0 then
+				localEcho(string.format("Пропущен %s (офлайн)", playerInfo[1]));
+			else
+				local currentDkp = 1 * (playerInfo[2] or 0);
+				local expectedAfter = currentDkp + dkp;
+				SOTA_ApplyPlayerDKP(playerInfo[1], dkp, true);
+				table.insert(tidChanges, { playerInfo[1], dkp });
+				table.insert(targets, { playerInfo[1], expectedAfter, dkp });
 			end
 		end
-		
-		local instance, zonename;
-		local zonecheck = SOTA_CONFIG_EnableZoneCheck;
-		if zonecheck == 1 then
-			instance, zonename = SOTA_GetValidDKPZones();
-			if not instance then
-				zonecheck = 0;
-			end
+	end
+	
+	local instance, zonename;
+	local zonecheck = SOTA_CONFIG_EnableZoneCheck;
+	if zonecheck == 1 then
+		instance, zonename = SOTA_GetValidDKPZones();
+		if not instance then
+			zonecheck = 0;
 		end
-		
-		for n=1, table.getn(SOTA_RaidQueue), 1 do
-			local queueEntry = SOTA_RaidQueue[n];
-			if not queueEntry then
-				break;
+	end
+	
+	for n=1, table.getn(SOTA_RaidQueue), 1 do
+		local queueEntry = SOTA_RaidQueue[n];
+		if not queueEntry then
+			break;
+		end
+		local guildInfo = SOTA_GetGuildPlayerInfo(queueEntry[1]);
+		if guildInfo then
+			local eligibleForDKP = true;
+			if guildInfo[5] == 0 and onlinecheck == 1 then
+				localEcho(string.format("No queue DKP for %s (Offline)", queueEntry[1]));
+				eligibleForDKP = false;
 			end
-			
-			local guildInfo = SOTA_GetGuildPlayerInfo(queueEntry[1]);
-
-			if guildInfo then
-				local eligibleForDKP = true;
-
-				-- Player is OFFLINE, skip if not allowed
-				if guildInfo[5] == 0 and onlinecheck == 1 then
-					localEcho(string.format("No queue DKP for %s (Offline)", queueEntry[1]));
+			if eligibleForDKP and guildInfo[5] == 1 and zonecheck == 1 then
+				if not(guildInfo[6] == instance or guildInfo[6] == zonename) then
+					localEcho(string.format("No queue DKP for %s (location: %s)", queueEntry[1], guildInfo[6]));
 					eligibleForDKP = false;
 				end
-				
-				-- Player is not in raid zone
-				if eligibleForDKP and guildInfo[5] == 1 and zonecheck == 1 then
-						if not(guildInfo[6] == instance or guildInfo[6] == zonename) then
-							localEcho(string.format("No queue DKP for %s (location: %s)", queueEntry[1], guildInfo[6]));
-							eligibleForDKP = false;
-						end;
-				end;
-							
-				if eligibleForDKP then				   
-					SOTA_ApplyPlayerDKP(queueEntry[1], dkp);
-					tidChanges[tidIndex] = { queueEntry[1], dkp };
-					tidIndex = tidIndex + 1;
-					SOTA_QueuedPlayersImpacteded = SOTA_QueuedPlayersImpacteded + 1;
-				end
+			end
+			if eligibleForDKP then
+				local currentDkp = 1 * (guildInfo[2] or 0);
+				local expectedAfter = currentDkp + dkp;
+				SOTA_ApplyPlayerDKP(queueEntry[1], dkp, true);
+				table.insert(tidChanges, { queueEntry[1], dkp });
+				table.insert(targets, { queueEntry[1], expectedAfter, dkp });
+				SOTA_QueuedPlayersImpacteded = SOTA_QueuedPlayersImpacteded + 1;
 			end
 		end
-		
-		if not silentmode then
---			publicEcho(string.format("%d DKP was added to all players in raid", dkp));
-			SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRaid, "", dkp, "", "", boss);
-		end
-		
-		SOTA_LogMultipleTransactions(callMethod, tidChanges)				
+	end
+	
+	if table.getn(targets) == 0 then
+		localEcho("Нет игроков для начисления DKP.");
 		return true;
 	end
-	return false;
+	
+	local st = SOTA_DKPVerifyState;
+	st.phase = "pending";
+	st.targets = targets;
+	st.retryCount = 0;
+	st.completionFunc = function()
+		if not silentmode then
+			SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRaid, "", dkp, "", "", boss);
+		end
+		SOTA_LogMultipleTransactions(callMethod, tidChanges);
+		if extraCompletion then
+			extraCompletion();
+		end
+	end;
+	
+	SOTA_RequestUpdateGuildRoster();
+	return true;
 end
 
 --[[
@@ -1068,86 +1146,94 @@ end
 local SOTA_QueuedPlayersImpacted;
 function SOTA_AddRaidDKPAttendance(arg, silentmode, callMethod)
 	SOTA_QueuedPlayersImpacteded = 0;
-	local _, _, dkp, raid = string.find(arg, "(%S+)%s+(.+)");
-	if SOTA_IsInRaid(true) then	
-		dkp = 1 * dkp;
-		
-		if not callMethod then
-			callMethod = "+Raid";
-		end
-		
-		local tidIndex = 1
-		local tidChanges = { }
+	local _, _, dkpStr, raid = string.find(arg, "(%S+)%s+(.+)");
+	if not dkpStr or not raid then
+		return false;
+	end
+	local dkp = 1 * dkpStr;
+	if not SOTA_IsInRaid(true) then
+		return false;
+	end
+	if not callMethod then
+		callMethod = "+Raid";
+	end
 
-		local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
-		local raidRoster = SOTA_GetRaidRoster();
-		for n=1, table.getn(raidRoster), 1 do
-			local playerInfo = raidRoster[n];
-			if playerInfo then
-				-- Проверяем онлайн/офлайн для рейда, если включена проверка
-				if onlinecheck == 1 and playerInfo[5] == 0 then
-					-- Игрок офлайн, пропускаем
-					localEcho(string.format("Пропущен %s (офлайн)", playerInfo[1]));
-				else
-					SOTA_ApplyPlayerDKP(playerInfo[1], dkp);
-					tidChanges[tidIndex] = { playerInfo[1], dkp };
-					tidIndex = tidIndex + 1;
-				end
-			end
-		end
-		
-		local instance, zonename;
-		local zonecheck = SOTA_CONFIG_EnableZoneCheck;
-		if zonecheck == 1 then
-			instance, zonename = SOTA_GetValidDKPZones();
-			if not instance then
-				zonecheck = 0;
-			end
-		end
-		
-		for n=1, table.getn(SOTA_RaidQueue), 1 do
-			local queueEntry = SOTA_RaidQueue[n];
-			if not queueEntry then
-				break;
-			end
-			
-			local guildInfo = SOTA_GetGuildPlayerInfo(queueEntry[1]);
-
-			if guildInfo then
-				local eligibleForDKP = true;
+	local tidChanges = { };
+	local targets = { };
+	local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
+	local raidRoster = SOTA_GetRaidRoster();
 	
-				-- Player is OFFLINE, skip if not allowed
-				if guildInfo[5] == 0 and onlinecheck == 1 then
-					localEcho(string.format("No queue DKP for %s (Offline)", queueEntry[1]));
+	for n=1, table.getn(raidRoster), 1 do
+		local playerInfo = raidRoster[n];
+		if playerInfo then
+			if onlinecheck == 1 and playerInfo[5] == 0 then
+				localEcho(string.format("Пропущен %s (офлайн)", playerInfo[1]));
+			else
+				local currentDkp = 1 * (playerInfo[2] or 0);
+				local expectedAfter = currentDkp + dkp;
+				SOTA_ApplyPlayerDKP(playerInfo[1], dkp, true);
+				table.insert(tidChanges, { playerInfo[1], dkp });
+				table.insert(targets, { playerInfo[1], expectedAfter, dkp });
+			end
+		end
+	end
+	
+	local instance, zonename;
+	local zonecheck = SOTA_CONFIG_EnableZoneCheck;
+	if zonecheck == 1 then
+		instance, zonename = SOTA_GetValidDKPZones();
+		if not instance then
+			zonecheck = 0;
+		end
+	end
+	
+	for n=1, table.getn(SOTA_RaidQueue), 1 do
+		local queueEntry = SOTA_RaidQueue[n];
+		if not queueEntry then
+			break;
+		end
+		local guildInfo = SOTA_GetGuildPlayerInfo(queueEntry[1]);
+		if guildInfo then
+			local eligibleForDKP = true;
+			if guildInfo[5] == 0 and onlinecheck == 1 then
+				localEcho(string.format("No queue DKP for %s (Offline)", queueEntry[1]));
+				eligibleForDKP = false;
+			end
+			if eligibleForDKP and guildInfo[5] == 1 and zonecheck == 1 then
+				if not(guildInfo[6] == instance or guildInfo[6] == zonename) then
+					localEcho(string.format("No queue DKP for %s (location: %s)", queueEntry[1], guildInfo[6]));
 					eligibleForDKP = false;
 				end
-				
-				-- Player is not in raid zone
-				if eligibleForDKP and guildInfo[5] == 1 and zonecheck == 1 then
-						if not(guildInfo[6] == instance or guildInfo[6] == zonename) then
-							localEcho(string.format("No queue DKP for %s (location: %s)", queueEntry[1], guildInfo[6]));
-							eligibleForDKP = false;
-						end;
-				end;
-								
-				if eligibleForDKP then				   
-					SOTA_ApplyPlayerDKP(queueEntry[1], dkp);
-					tidChanges[tidIndex] = { queueEntry[1], dkp };
-					tidIndex = tidIndex + 1;
-					SOTA_QueuedPlayersImpacteded = SOTA_QueuedPlayersImpacteded + 1;
-				end
+			end
+			if eligibleForDKP then
+				local currentDkp = 1 * (guildInfo[2] or 0);
+				local expectedAfter = currentDkp + dkp;
+				SOTA_ApplyPlayerDKP(queueEntry[1], dkp, true);
+				table.insert(tidChanges, { queueEntry[1], dkp });
+				table.insert(targets, { queueEntry[1], expectedAfter, dkp });
+				SOTA_QueuedPlayersImpacteded = SOTA_QueuedPlayersImpacteded + 1;
 			end
 		end
-		
-		if not silentmode then
---			publicEcho(string.format("%d DKP was added to all players in raid", dkp));
-			SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRaidAttendance, "", dkp, "", "", raid);
-		end
-		
-		SOTA_LogMultipleTransactions(callMethod, tidChanges)				
+	end
+	
+	if table.getn(targets) == 0 then
+		localEcho("Нет игроков для начисления DKP.");
 		return true;
 	end
-	return false;
+	
+	local st = SOTA_DKPVerifyState;
+	st.phase = "pending";
+	st.targets = targets;
+	st.retryCount = 0;
+	st.completionFunc = function()
+		if not silentmode then
+			SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRaidAttendance, "", dkp, "", "", raid);
+		end
+		SOTA_LogMultipleTransactions(callMethod, tidChanges);
+	end;
+	
+	SOTA_RequestUpdateGuildRoster();
+	return true;
 end
 
 --[[
@@ -1164,81 +1250,90 @@ end
 local SOTA_QueuedPlayersImpacted;
 function SOTA_AddRaidDKPNoWipes(dkp, silentmode, callMethod)
 	SOTA_QueuedPlayersImpacteded = 0;
+	if not SOTA_IsInRaid(true) then
+		return false;
+	end
+	dkp = 1 * dkp;
+	if not callMethod then
+		callMethod = "+Raid";
+	end
 
-	if SOTA_IsInRaid(true) then	
-		dkp = 1 * dkp;
-		
-		if not callMethod then
-			callMethod = "+Raid";
-		end
-		
-		local tidIndex = 1
-		local tidChanges = { }
-
-		local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
-		local raidRoster = SOTA_GetRaidRoster();
-		for n=1, table.getn(raidRoster), 1 do
-			local playerInfo = raidRoster[n];
-			if playerInfo then
-				-- Проверяем онлайн/офлайн для рейда, если включена проверка
-				if onlinecheck == 1 and playerInfo[5] == 0 then
-					-- Игрок офлайн, пропускаем
-					localEcho(string.format("Пропущен %s (офлайн)", playerInfo[1]));
-				else
-					SOTA_ApplyPlayerDKP(playerInfo[1], dkp);
-					tidChanges[tidIndex] = { playerInfo[1], dkp };
-					tidIndex = tidIndex + 1;
-				end
-			end
-		end
-		
-		local instance, zonename;
-		local zonecheck = SOTA_CONFIG_EnableZoneCheck;
-		if zonecheck == 1 then
-			instance, zonename = SOTA_GetValidDKPZones();
-			if not instance then
-				zonecheck = 0;
-			end
-		end
-		
-		for n=1, table.getn(SOTA_RaidQueue), 1 do
-			local guildInfo = SOTA_GetGuildPlayerInfo(SOTA_RaidQueue[n][1]);
-
-			if guildInfo then
-				local eligibleForDKP = true;
+	local tidChanges = { };
+	local targets = { };
+	local onlinecheck = SOTA_CONFIG_EnableOnlineCheck;
+	local raidRoster = SOTA_GetRaidRoster();
 	
-				-- Player is OFFLINE, skip if not allowed
-				if guildInfo[5] == 0 and onlinecheck == 1 then
-					localEcho(string.format("No queue DKP for %s (Offline)", queueEntry[1]));
+	for n=1, table.getn(raidRoster), 1 do
+		local playerInfo = raidRoster[n];
+		if playerInfo then
+			if onlinecheck == 1 and playerInfo[5] == 0 then
+				localEcho(string.format("Пропущен %s (офлайн)", playerInfo[1]));
+			else
+				local currentDkp = 1 * (playerInfo[2] or 0);
+				local expectedAfter = currentDkp + dkp;
+				SOTA_ApplyPlayerDKP(playerInfo[1], dkp, true);
+				table.insert(tidChanges, { playerInfo[1], dkp });
+				table.insert(targets, { playerInfo[1], expectedAfter, dkp });
+			end
+		end
+	end
+	
+	local instance, zonename;
+	local zonecheck = SOTA_CONFIG_EnableZoneCheck;
+	if zonecheck == 1 then
+		instance, zonename = SOTA_GetValidDKPZones();
+		if not instance then
+			zonecheck = 0;
+		end
+	end
+	
+	for n=1, table.getn(SOTA_RaidQueue), 1 do
+		local queueEntry = SOTA_RaidQueue[n];
+		if not queueEntry then
+			break;
+		end
+		local guildInfo = SOTA_GetGuildPlayerInfo(queueEntry[1]);
+		if guildInfo then
+			local eligibleForDKP = true;
+			if guildInfo[5] == 0 and onlinecheck == 1 then
+				localEcho(string.format("No queue DKP for %s (Offline)", queueEntry[1]));
+				eligibleForDKP = false;
+			end
+			if eligibleForDKP and guildInfo[5] == 1 and zonecheck == 1 then
+				if not(guildInfo[6] == instance or guildInfo[6] == zonename) then
+					localEcho(string.format("No queue DKP for %s (location: %s)", queueEntry[1], guildInfo[6]));
 					eligibleForDKP = false;
 				end
-				
-				-- Player is not in raid zone
-				if eligibleForDKP and guildInfo[5] == 1 and zonecheck == 1 then
-						if not(guildInfo[6] == instance or guildInfo[6] == zonename) then
-							localEcho(string.format("No queue DKP for %s (location: %s)", queueEntry[1], guildInfo[6]));
-							eligibleForDKP = false;
-						end;
-				end;
-								
-				if eligibleForDKP then				   
-					SOTA_ApplyPlayerDKP(queueEntry[1], dkp);
-					tidChanges[tidIndex] = { queueEntry[1], dkp };
-					tidIndex = tidIndex + 1;
-					SOTA_QueuedPlayersImpacteded = SOTA_QueuedPlayersImpacteded + 1;
-				end
+			end
+			if eligibleForDKP then
+				local currentDkp = 1 * (guildInfo[2] or 0);
+				local expectedAfter = currentDkp + dkp;
+				SOTA_ApplyPlayerDKP(queueEntry[1], dkp, true);
+				table.insert(tidChanges, { queueEntry[1], dkp });
+				table.insert(targets, { queueEntry[1], expectedAfter, dkp });
+				SOTA_QueuedPlayersImpacteded = SOTA_QueuedPlayersImpacteded + 1;
 			end
 		end
-		
-		if not silentmode then
---			publicEcho(string.format("%d DKP was added to all players in raid", dkp));
-			SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRaidNoWipes, "", dkp);
-		end
-		
-		SOTA_LogMultipleTransactions(callMethod, tidChanges)				
+	end
+	
+	if table.getn(targets) == 0 then
+		localEcho("Нет игроков для начисления DKP.");
 		return true;
 	end
-	return false;
+	
+	local st = SOTA_DKPVerifyState;
+	st.phase = "pending";
+	st.targets = targets;
+	st.retryCount = 0;
+	st.completionFunc = function()
+		if not silentmode then
+			SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRaidNoWipes, "", dkp);
+		end
+		SOTA_LogMultipleTransactions(callMethod, tidChanges);
+	end;
+	
+	SOTA_RequestUpdateGuildRoster();
+	return true;
 end
 
 --[[
@@ -1253,43 +1348,55 @@ function SOTA_Call_SubtractRaidDKP(dkp)
 	end
 end
 function SOTA_SubtractRaidDKP(dkp, silentmode, callMethod)
-	if SOTA_IsInRaid(true) then	
-		dkp = -1 * dkp;
+	if not SOTA_IsInRaid(true) then
+		return false;
+	end
+	dkp = -1 * dkp;
+	if not callMethod then
+		callMethod = "-Raid";
+	end
 
-		if not callMethod then
-			callMethod = "-Raid";
-		end
+	local tidChanges = { };
+	local targets = { };
+	local raidRoster = SOTA_GetRaidRoster();
+	
+	for n=1, table.getn(raidRoster), 1 do
+		local playerInfo = raidRoster[n];
+		local currentDkp = 1 * (playerInfo[2] or 0);
+		local expectedAfter = currentDkp + dkp;
+		SOTA_ApplyPlayerDKP(playerInfo[1], dkp, true);
+		table.insert(tidChanges, { playerInfo[1], dkp });
+		table.insert(targets, { playerInfo[1], expectedAfter, dkp });
+	end
 
-		local tidIndex = 1
-		local tidChanges = { }
-		
-		local raidRoster = SOTA_GetRaidRoster();
-		for n=1, table.getn(raidRoster), 1 do
-			SOTA_ApplyPlayerDKP(raidRoster[n][1], dkp);
-			
-			tidChanges[tidIndex] = { raidRoster[n][1], dkp };
-			tidIndex = tidIndex + 1;
+	for n=1, table.getn(SOTA_RaidQueue), 1 do
+		local guildInfo = SOTA_GetGuildPlayerInfo(SOTA_RaidQueue[n][1]);
+		if guildInfo and guildInfo[5] == 1 then
+			local currentDkp = 1 * (guildInfo[2] or 0);
+			local expectedAfter = currentDkp + dkp;
+			SOTA_ApplyPlayerDKP(SOTA_RaidQueue[n][1], dkp, true);
+			table.insert(tidChanges, { SOTA_RaidQueue[n][1], dkp });
+			table.insert(targets, { SOTA_RaidQueue[n][1], expectedAfter, dkp });
 		end
-
-		for n=1, table.getn(SOTA_RaidQueue), 1 do
-			local guildInfo = SOTA_GetGuildPlayerInfo(SOTA_RaidQueue[n][1]);
-			if guildInfo and guildInfo[5] == 1 then
-				SOTA_ApplyPlayerDKP(SOTA_RaidQueue[n][1], dkp);
-				
-				tidChanges[tidIndex] = { SOTA_RaidQueue[n][1], dkp };
-				tidIndex = tidIndex + 1;
-			end
-		end
-		
-		if not silentmode then
---			publicEcho(string.format("%d DKP was subtracted from all players in raid", abs(dkp)));
-			SOTA_EchoEvent(SOTA_MSG_OnDKPSubtractRaid, "", dkp);
-		end
-
-		SOTA_LogMultipleTransactions(callMethod, tidChanges)
+	end
+	
+	if table.getn(targets) == 0 then
 		return true;
 	end
-	return false;
+	
+	local st = SOTA_DKPVerifyState;
+	st.phase = "pending";
+	st.targets = targets;
+	st.retryCount = 0;
+	st.completionFunc = function()
+		if not silentmode then
+			SOTA_EchoEvent(SOTA_MSG_OnDKPSubtractRaid, "", dkp);
+		end
+		SOTA_LogMultipleTransactions(callMethod, tidChanges);
+	end;
+	
+	SOTA_RequestUpdateGuildRoster();
+	return true;
 end
 
 
@@ -1305,77 +1412,99 @@ function SOTA_Call_AddRangedDKP(dkp)
 		SOTA_RequestUpdateGuildRoster();
 	end
 end
-function SOTA_AddRangedDKP(dkp, silentmode, dkpLabel, shareTheDKP)
+function SOTA_AddRangedDKP(dkp, silentmode, dkpLabel, shareTheDKP, shareCompletion)
 	dkp = 1 * dkp;
-
 	SOTA_QueuedPlayersImpacted = 0;
 	local raidUpdateCount = 0;
-	local tidIndex = 1;
 	local tidChanges = { };
+	local targets = { };
 	
 	if not dkpLabel then
 		dkpLabel = "+Range";
 	end
 
-	-- If true, we must share the dkp across all players, so do a player count to calculate the avg dkp:
 	if shareTheDKP then
 		local playerCount = 0;
 		for n=1, 40, 1 do
 			local unitid = "raid"..n;
 			local player = UnitName(unitid);
-
-			if player then
-				if UnitIsConnected(unitid) and UnitIsVisible(unitid) then
-					playerCount = playerCount + 1;
-				end
+			if player and UnitIsConnected(unitid) and UnitIsVisible(unitid) then
+				playerCount = playerCount + 1;
 			end
 		end
-
 		if playerCount > 0 then
 			dkp = math.ceil(dkp / playerCount);
 		else
 			dkp = 0;
-		end;
-	end;
-	
+		end
+	end
 
 	for n=1, 40, 1 do
 		local unitid = "raid"..n;
 		local player = UnitName(unitid);
-
-		if player then
-			if UnitIsConnected(unitid) and UnitIsVisible(unitid) then
+		if player and UnitIsConnected(unitid) and UnitIsVisible(unitid) then
+			local guildInfo = SOTA_GetGuildPlayerInfo(player);
+			if guildInfo then
+				local currentDkp = 1 * (guildInfo[2] or 0);
+				local expectedAfter = currentDkp + dkp;
 				SOTA_ApplyPlayerDKP(player, dkp, true);
-				
-				tidChanges[tidIndex] = { player, dkp };
-				tidIndex = tidIndex + 1;
+				table.insert(tidChanges, { player, dkp });
+				table.insert(targets, { player, expectedAfter, dkp });
 				raidUpdateCount = raidUpdateCount + 1;
 			end
 		end
 	end
 	
 	for n=1, table.getn(SOTA_RaidQueue), 1 do
-		local guildInfo = SOTA_GetGuildPlayerInfo(SOTA_RaidQueue[n][1]);
+		local queueEntry = SOTA_RaidQueue[n];
+		if not queueEntry then
+			break;
+		end
+		local guildInfo = SOTA_GetGuildPlayerInfo(queueEntry[1]);
 		if guildInfo and (SOTA_CONFIG_EnableOnlineCheck == 0 or guildInfo[5] == 1) then
-			SOTA_ApplyPlayerDKP(SOTA_RaidQueue[n][1], dkp);
-			
-			tidChanges[tidIndex] = { SOTA_RaidQueue[n][1], dkp };
-			tidIndex = tidIndex + 1;
+			local currentDkp = 1 * (guildInfo[2] or 0);
+			local expectedAfter = currentDkp + dkp;
+			SOTA_ApplyPlayerDKP(queueEntry[1], dkp, true);
+			table.insert(tidChanges, { queueEntry[1], dkp });
+			table.insert(targets, { queueEntry[1], expectedAfter, dkp });
 			SOTA_QueuedPlayersImpacted = SOTA_QueuedPlayersImpacted + 1;
-		end;
+		end
 	end
 	
-	if not silentmode then
-		if SOTA_QueuedPlayersImpacted == 0 then
---			publicEcho(string.format("%d DKP has been added for %d players in range.", dkp, raidUpdateCount));
-			SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRange, "", dkp, "", "", raidUpdateCount);
-		else
---			publicEcho(string.format("%d DKP has been added for %d players in range (plus %d in queue).", dkp, raidUpdateCount, SOTA_QueuedPlayersImpacted));
-			SOTA_EchoEvent(SOTA_MSG_OnDKPAddedQueue, "", dkp, "", "", raidUpdateCount, SOTA_QueuedPlayersImpacted);
-		end;
+	if table.getn(targets) == 0 then
+		if not silentmode then
+			if SOTA_QueuedPlayersImpacted == 0 then
+				SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRange, "", dkp, "", "", raidUpdateCount);
+			else
+				SOTA_EchoEvent(SOTA_MSG_OnDKPAddedQueue, "", dkp, "", "", raidUpdateCount, SOTA_QueuedPlayersImpacted);
+			end
+		end
+		SOTA_LogMultipleTransactions(dkpLabel, tidChanges);
+		return raidUpdateCount;
 	end
 	
-	SOTA_LogMultipleTransactions(dkpLabel, tidChanges)	
+	local qp = SOTA_QueuedPlayersImpacted;
+	local ru = raidUpdateCount;
+	local dl = dkpLabel;
+	local sm = silentmode;
+	local st = SOTA_DKPVerifyState;
+	st.phase = "pending";
+	st.targets = targets;
+	st.retryCount = 0;
+	st.completionFunc = function()
+		if shareCompletion then
+			shareCompletion(ru, qp, dkp);
+		elseif not sm then
+			if qp == 0 then
+				SOTA_EchoEvent(SOTA_MSG_OnDKPAddedRange, "", dkp, "", "", ru);
+			else
+				SOTA_EchoEvent(SOTA_MSG_OnDKPAddedQueue, "", dkp, "", "", ru, qp);
+			end
+		end
+		SOTA_LogMultipleTransactions(dl, tidChanges);
+	end;
+	
+	SOTA_RequestUpdateGuildRoster();
 	return raidUpdateCount;
 end
 
@@ -1428,31 +1557,28 @@ function SOTA_Call_ShareDKP(dkp)
 	end
 end
 function SOTA_ShareDKP(sharedDkp)
-	if SOTA_IsInRaid(true) then	
-		sharedDkp = abs(1 * sharedDkp);
-
-		local tidIndex = 1;
-		local tidChanges = { };
-		
-		local dkp = 0;
-		local raidRoster = SOTA_GetRaidRoster();
-		local count = table.getn(raidRoster);
-		if count > 0 then
-			dkp = ceil(sharedDkp / count);
-		end
-		
-		if SOTA_AddRaidDKP(dkp, true, "+Share") then
-			if SOTA_QueuedPlayersImpacteded == 0 then
---				publicEcho(string.format("%d DKP was shared (%s DKP per player)", sharedDkp, dkp));
-				SOTA_EchoEvent(SOTA_MSG_OnDKPShared, "", dkp, "", "", sharedDkp);
-			else
---				publicEcho(string.format("%d DKP was shared (%s DKP per player plus %d in queue)", sharedDkp, dkp, SOTA_QueuedPlayersImpacteded));
-				SOTA_EchoEvent(SOTA_MSG_OnDKPSharedQueue, "", dkp, "", "", sharedDkp, SOTA_QueuedPlayersImpacteded);
-			end;
-		end
-		return true;
+	if not SOTA_IsInRaid(true) then
+		return false;
 	end
-	return false;
+	sharedDkp = abs(1 * sharedDkp);
+	local dkp = 0;
+	local raidRoster = SOTA_GetRaidRoster();
+	local count = table.getn(raidRoster);
+	if count > 0 then
+		dkp = ceil(sharedDkp / count);
+	end
+	
+	local qp = 0;
+	local extraCompletion = function()
+		qp = SOTA_QueuedPlayersImpacteded or 0;
+		if qp == 0 then
+			SOTA_EchoEvent(SOTA_MSG_OnDKPShared, "", dkp, "", "", sharedDkp);
+		else
+			SOTA_EchoEvent(SOTA_MSG_OnDKPSharedQueue, "", dkp, "", "", sharedDkp, qp);
+		end
+	end;
+	
+	return SOTA_AddRaidDKP(dkp, true, "+Share", extraCompletion);
 end
 
 --[[
@@ -1468,23 +1594,22 @@ function SOTA_Call_ShareRangedDKP(dkp)
 	end
 end
 function SOTA_ShareRangedDKP(sharedDkp)
-	if SOTA_IsInRaid(true) then	
-		sharedDkp = abs(1 * sharedDkp);
-		
-		local inRange = SOTA_AddRangedDKP(sharedDkp, true, "+ShRange", true);
-		if inRange > 0 then
-			local dkp = ceil(sharedDkp / inRange);
-			if SOTA_QueuedPlayersImpacted == 0 then
---				publicEcho(string.format("%d DKP was shared for %d players in range (%s DKP per player)", sharedDkp, inRange, dkp));
-				SOTA_EchoEvent(SOTA_MSG_OnDKPSharedRange, "", dkp, "", "", sharedDkp, inRange);
-			else
---				publicEcho(string.format("%d DKP was shared for %d players in range (%s DKP per player plus %d in queue)", sharedDkp, inRange, dkp, SOTA_QueuedPlayersImpacted));
-				SOTA_EchoEvent(SOTA_MSG_OnDKPSharedRangeQ, "", dkp, "", "", sharedDkp, inRange, SOTA_QueuedPlayersImpacted);
-			end;
-		end
-		return true;
+	if not SOTA_IsInRaid(true) then
+		return false;
 	end
-	return false;
+	sharedDkp = abs(1 * sharedDkp);
+	local sharedDkpVal = sharedDkp;
+	local shareCompletion = function(inRange, qCount, dkpPerPlayer)
+		if inRange > 0 or qCount > 0 then
+			if qCount == 0 then
+				SOTA_EchoEvent(SOTA_MSG_OnDKPSharedRange, "", dkpPerPlayer, "", "", sharedDkpVal, inRange);
+			else
+				SOTA_EchoEvent(SOTA_MSG_OnDKPSharedRangeQ, "", dkpPerPlayer, "", "", sharedDkpVal, inRange, qCount);
+			end
+		end
+	end;
+	SOTA_AddRangedDKP(sharedDkp, true, "+ShRange", true, shareCompletion);
+	return true;
 end
 
 
@@ -1568,7 +1693,6 @@ function SOTA_DecayDKP(percent, silentmode)
 		return false;
 	end
 	
-	--	Note: arg may contain a percent sign; remove this first:
 	if tonumber(percent) == nil then
 		local pctSign = string.sub(percent, string.len(percent), string.len(percent));
 		if pctSign == "%" then
@@ -1585,8 +1709,6 @@ function SOTA_DecayDKP(percent, silentmode)
 	
 	percent = abs(1 * percent);
 
-	--	This ensure the guild roster also contains Offline members.
-	--	Otherwise offline members will not get decayed!
 	if not GetGuildRosterShowOffline() == 1 then
 		if not silentmode then
 			localEcho("Guild Decay cancelled: You need to enable Offline Guild Members in the guild roster first.")
@@ -1594,53 +1716,64 @@ function SOTA_DecayDKP(percent, silentmode)
 		return false;
 	end
 
-	local tidIndex = 1;
 	local tidChanges = { };
-
+	local targets = { };
 	local reducedDkp = 0;
 	local playerCount = 0;
-
-	--	Iterate over all guilded players - online or not
-	local name, publicNote, officerNote
 	local memberCount = GetNumGuildMembers();
-	for n=1,memberCount,1 do
-		name, _, _, _, _, _, publicNote, officerNote = GetGuildRosterInfo(n);
+
+	for n=1, memberCount, 1 do
+		local name, _, _, _, _, _, publicNote, officerNote = GetGuildRosterInfo(n);
 		local note = officerNote;
 		if SOTA_CONFIG_UseGuildNotes == 1 then
 			note = publicNote;
 		end
+		if not note or note == "" then
+			note = "";
+		end
 
-		local _, _, dkp = string.find(note, "<(-?%d*)>");
-		if dkp and tonumber(dkp) ~= nil then
-			local minus = floor(dkp * percent / 100)
-			tidChanges[tidIndex] = { name, (-1 * minus) }
-			tidIndex = tidIndex + 1
-			
-			dkp = dkp - minus;
-			reducedDkp = reducedDkp + minus;
-			playerCount = playerCount + 1;
-			note = string.gsub(note, "<(-?%d*)>", SOTA_CreateDkpString(dkp), 1);
-		else
-			dkp = 0;
-			note = note..SOTA_CreateDkpString(dkp);
-		end
+		local _, _, dkpStr = string.find(note, "<(-?%d*)>");
+		local dkp = (dkpStr and tonumber(dkpStr)) and (1 * dkpStr) or 0;
+		local minus = floor(dkp * percent / 100);
 		
-		if SOTA_CONFIG_UseGuildNotes == 1 then
-			GuildRosterSetPublicNote(n, note);
-		else
-			GuildRosterSetOfficerNote(n, note);
+		if minus ~= 0 then
+			local dkpDelta = -1 * minus;
+			local expectedAfter = dkp + dkpDelta;
+			if SOTA_ApplyPlayerDKP(name, dkpDelta, true) then
+				table.insert(tidChanges, { name, dkpDelta });
+				table.insert(targets, { name, expectedAfter, dkpDelta });
+				reducedDkp = reducedDkp + minus;
+				playerCount = playerCount + 1;
+			end
 		end
-		
-		SOTA_UpdateLocalDKP(name, dkp);
 	end
 	
-	if not silentmode then
-		guildEcho("Гильдейский дикей ДКП "..percent.."% был выполнен ".. UnitName("player") ..".")
-		guildEcho("Дикей снял "..reducedDkp.." ДКП С ".. playerCount .." игроков.")
+	if table.getn(targets) == 0 then
+		if not silentmode then
+			guildEcho("Гильдейский дикей ДКП "..percent.."% был выполнен ".. UnitName("player") ..".")
+			guildEcho("Дикей снял "..reducedDkp.." ДКП С ".. playerCount .." игроков.")
+		end
+		SOTA_LogMultipleTransactions("-Decay", tidChanges);
+		return true;
 	end
 	
-	SOTA_LogMultipleTransactions("-Decay", tidChanges)
+	local pct = percent;
+	local rd = reducedDkp;
+	local pc = playerCount;
+	local sm = silentmode;
+	local st = SOTA_DKPVerifyState;
+	st.phase = "pending";
+	st.targets = targets;
+	st.retryCount = 0;
+	st.completionFunc = function()
+		if not sm then
+			guildEcho("Гильдейский дикей ДКП "..pct.."% был выполнен ".. UnitName("player") ..".")
+			guildEcho("Дикей снял "..rd.." ДКП С ".. pc .." игроков.")
+		end
+		SOTA_LogMultipleTransactions("-Decay", tidChanges);
+	end;
 	
+	SOTA_RequestUpdateGuildRoster();
 	return true;
 end
 
@@ -1792,6 +1925,9 @@ function SOTA_ApplyPlayerDKP(playername, dkpValue, silentmode)
 			local note = officerNote;
 			if SOTA_CONFIG_UseGuildNotes == 1 then
 				note = publicNote;
+			end
+			if not note or note == "" then
+				note = "";
 			end
 		
 			local _, _, dkp = string.find(note, "<(-?%d*)>");
