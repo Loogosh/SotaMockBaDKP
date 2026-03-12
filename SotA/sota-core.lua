@@ -207,8 +207,7 @@ end
 
 --[[
 --	Echo event message (wrapper for configurable messages)
---	Вернута упрощённая логика, как в оригинале: берём текст события и шлём его в publicEcho.
---	Если система сообщений ещё не инициализирована, просто пытаемся подкинуть дефолты и тихо выходим.
+--	Теперь отправляет через addon-канал + fallback в рейд только для старта/завершения
 --]]
 function SOTA_EchoEvent(msgKey, item, dkp, bidder, rank, param1, param2, param3)
 	-- Если по какой‑то причине опции ещё не загрузились, просто выходим без спама в чат
@@ -226,8 +225,73 @@ function SOTA_EchoEvent(msgKey, item, dkp, bidder, rank, param1, param2, param3)
 	end
 
 	local msgInfo = SOTA_getConfigurableMessage(msgKey, item, dkp, bidder, rank, param1, param2, param3);
-	if msgInfo then
-		publicEcho(msgInfo);
+	
+	-- Извлекаем itemId из itemLink если есть
+	local itemId = nil
+	if item and type(item) == "string" then
+		local _, _, id = string.find(item, "item:(%d+):")
+		if id then
+			itemId = tonumber(id)
+		end
+	end
+	
+	-- Отправляем через addon-канал в зависимости от типа события
+	if msgKey == SOTA_MSG_OnOpen then
+		-- Старт аукциона
+		if itemId and dkp then
+			SOTA_SendAuctionStart(item, itemId, dkp, SOTA_CONFIG_AuctionTime)
+		end
+		-- Fallback в рейд-чат
+		if msgInfo then
+			publicEcho(msgInfo)
+		end
+		
+	elseif msgKey == SOTA_MSG_OnComplete then
+		-- Завершение аукциона
+		if itemId and bidder and dkp then
+			SOTA_SendAuctionEnd(item, itemId, bidder, dkp)
+		end
+		-- Fallback в рейд-чат
+		if msgInfo then
+			publicEcho(msgInfo)
+		end
+		
+	elseif msgKey == SOTA_MSG_OnMainspecBid or msgKey == SOTA_MSG_OnOffspecBid or 
+	       msgKey == SOTA_MSG_OnMainspecMaxBid or msgKey == SOTA_MSG_OnOffspecMaxBid then
+		-- Обновление ставки - только через addon
+		if bidder and dkp then
+			local bidType = (msgKey == SOTA_MSG_OnMainspecBid or msgKey == SOTA_MSG_OnMainspecMaxBid) and 1 or 2
+			SOTA_SendBidUpdate(bidder, dkp, bidType, rank)
+		end
+		
+	elseif msgKey == SOTA_MSG_OnPause then
+		-- Пауза - только через addon
+		SOTA_SendAuctionPause()
+		
+	elseif msgKey == SOTA_MSG_OnResume then
+		-- Возобновление - только через addon
+		SOTA_SendAuctionResume()
+		
+	elseif msgKey == SOTA_MSG_OnCancel or msgKey == SOTA_MSG_OnClose then
+		-- Отмена/закрытие - только через addon
+		SOTA_SendAuctionCancel()
+		
+	elseif msgKey == SOTA_MSG_On10SecondsLeft or msgKey == SOTA_MSG_On5SecondsLeft or 
+	       msgKey == SOTA_MSG_On3SecondsLeft or msgKey == SOTA_MSG_On1SecondLeft then
+		-- Таймер - только через addon
+		local seconds = 0
+		if msgKey == SOTA_MSG_On10SecondsLeft then seconds = 10
+		elseif msgKey == SOTA_MSG_On5SecondsLeft then seconds = 5
+		elseif msgKey == SOTA_MSG_On3SecondsLeft then seconds = 3
+		elseif msgKey == SOTA_MSG_On1SecondLeft then seconds = 1
+		end
+		SOTA_SendTimerUpdate(seconds)
+		
+	else
+		-- Для остальных событий (DKP начисления и т.д.) оставляем старое поведение
+		if msgInfo then
+			publicEcho(msgInfo)
+		end
 	end
 end
 

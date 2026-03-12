@@ -6,6 +6,7 @@
 
 sota-options.xml
 sota-core.xml
+sota-comm.lua
 sota-raidqueue.xml
 sota-transactionlog.xml
 sota-auction.xml

@@ -1519,6 +1519,36 @@ end;
 
 function SOTA_OnChatMsgAddon(event, prefix, msg, channel, sender)
 	--echo(string.format("Prefix=%s, MSG=%s", prefix, msg));
+	
+	-- Handle MDKP client messages (bids)
+	if prefix == MDKP_CLT_PREFIX then
+		local version, msgType, payload = SOTA_ParseAddonMessage(msg)
+		
+		if not msgType then
+			return
+		end
+		
+		if msgType == "HELLO" then
+			-- Client announces itself
+			local clientVersion = payload.v or "unknown"
+			SOTA_RegisterAddonClient(sender, clientVersion)
+			
+		elseif msgType == "BID" then
+			-- Client places a bid
+			local bidType = payload.type or "ms"
+			local bidValue = payload.value
+			
+			if not bidValue then
+				return
+			end
+			
+			-- Convert to old format for SOTA_HandlePlayerBid
+			local command = bidType .. " " .. bidValue
+			SOTA_HandlePlayerBid(sender, command)
+		end
+		
+		return
+	end
 
 	if (prefix == SOTA_MESSAGE_PREFIX) or (prefix == "GuildDKPv1") then	
 		--	Split incoming message in Command, Payload (message) and Recipient
@@ -1779,6 +1809,9 @@ function SOTA_OnLoad()
 	this:RegisterEvent("CHAT_MSG_RAID_LEADER");
 	this:RegisterEvent("CHAT_MSG_WHISPER");
 	this:RegisterEvent("CHAT_MSG_ADDON");
+
+	-- Initialize communication module
+	SOTA_InitCommunication();
 
     
 	SOTA_SetAuctionState(STATE_NONE);
