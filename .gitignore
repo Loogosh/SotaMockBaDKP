@@ -1,3 +1,12 @@
 /SotA/*.wowsuo
 /SotA/*.wowsln
 /SotA/LICENSE
+WoWClassicDocs/api_by_category.md
+WoWClassicDocs/chat_comm_templates.md
+WoWClassicDocs/dkp_loot_assistant.md
+WoWClassicDocs/events.md
+WoWClassicDocs/functions.md
+WoWClassicDocs/lua_gotchas.md
+WoWClassicDocs/superwow_nampower_unitxp.md
+WoWClassicDocs/templates_import_export.md
+WoWClassicDocs/ui_patterns.md

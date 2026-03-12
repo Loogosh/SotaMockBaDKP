@@ -452,12 +452,20 @@ end
 function SOTA_AuctionUIInit()
 	--	Initialize top <n> bids
 	for n=1, MAX_BIDS, 1 do
-		local entry = CreateFrame("Button", "$parentEntry"..n, AuctionUIFrameTableList, "SOTA_BidTemplate");
+		-- Имена дочерних фреймов должны быть полными, т.к. шаблон $parent обрабатывается только в XML.
+		-- Поэтому формируем реальные имена вида "AuctionUIFrameTableListEntry1", "AuctionUIFrameTableListEntry2", ...
+		local entryName = "AuctionUIFrameTableListEntry"..n;
+		local entry = CreateFrame("Button", entryName, AuctionUIFrameTableList, "SOTA_BidTemplate");
 		entry:SetID(n);
 		if n == 1 then
 			entry:SetPoint("TOPLEFT", 4, -4);
 		else
-			entry:SetPoint("TOP", "$parentEntry"..(n-1), "BOTTOM");
+			local prevEntry = getglobal("AuctionUIFrameTableListEntry"..(n-1));
+			if prevEntry then
+				entry:SetPoint("TOP", prevEntry, "BOTTOM");
+			else
+				entry:SetPoint("TOPLEFT", 4, -4);
+			end
 		end
 	end
 end;
