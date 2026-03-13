@@ -15,6 +15,13 @@ SOTA_TITAN_TITLE				= "SotA - DKP Distribution"
 
 local SOTA_DEBUG_ENABLED		= false;
 
+-- Callback система для Loot Assistant и других расширений
+SOTA_LA_Callbacks = SOTA_LA_Callbacks or {
+	onAuctionStart = nil,    -- function(itemLink, itemId, minBid)
+	onAuctionComplete = nil, -- function(itemLink, itemId, winner, bid)
+	onAuctionCancel = nil,   -- function(itemLink, itemId)
+}
+
 SOTA_CHAT_END					= "|r"
 SOTA_COLOUR_INTRO				= "|c80F0F0F0"
 SOTA_COLOUR_CHAT				= "|c8040A0F8"
@@ -246,6 +253,11 @@ function SOTA_EchoEvent(msgKey, item, dkp, bidder, rank, param1, param2, param3)
 			publicEcho(msgInfo)
 		end
 		
+		-- Callback для Loot Assistant
+		if SOTA_LA_Callbacks.onAuctionStart then
+			SOTA_LA_Callbacks.onAuctionStart(item, itemId, dkp)
+		end
+		
 	elseif msgKey == SOTA_MSG_OnComplete then
 		-- Завершение аукциона
 		if itemId and bidder and dkp then
@@ -254,6 +266,11 @@ function SOTA_EchoEvent(msgKey, item, dkp, bidder, rank, param1, param2, param3)
 		-- Fallback в рейд-чат
 		if msgInfo then
 			publicEcho(msgInfo)
+		end
+		
+		-- Callback для Loot Assistant
+		if SOTA_LA_Callbacks.onAuctionComplete then
+			SOTA_LA_Callbacks.onAuctionComplete(item, itemId, bidder, dkp)
 		end
 		
 	elseif msgKey == SOTA_MSG_OnMainspecBid or msgKey == SOTA_MSG_OnOffspecBid or 
@@ -275,6 +292,11 @@ function SOTA_EchoEvent(msgKey, item, dkp, bidder, rank, param1, param2, param3)
 	elseif msgKey == SOTA_MSG_OnCancel or msgKey == SOTA_MSG_OnClose then
 		-- Отмена/закрытие - только через addon
 		SOTA_SendAuctionCancel()
+		
+		-- Callback для Loot Assistant
+		if SOTA_LA_Callbacks.onAuctionCancel then
+			SOTA_LA_Callbacks.onAuctionCancel(item, itemId)
+		end
 		
 	elseif msgKey == SOTA_MSG_On10SecondsLeft or msgKey == SOTA_MSG_On5SecondsLeft or 
 	       msgKey == SOTA_MSG_On3SecondsLeft or msgKey == SOTA_MSG_On1SecondLeft then
@@ -2372,6 +2394,25 @@ function SOTA_ResetAllSettingsToDefault()
 	if SOTA_IsConfigurationDialogOpen and SOTA_IsConfigurationDialogOpen() then
 		SOTA_InitializeConfigSettings();
 	end
+	
+	-- Сброс настроек Loot Assistant
+	SOTA_CONFIG_LA_MinQuality = 4
+	SOTA_CONFIG_LA_AutoOpen = 1
+	SOTA_CONFIG_LA_ExcludeQuest = 1
 end;
 
+
+--[[
+--	======================
+--	LOOT ASSISTANT INTEGRATION
+--	======================
+--]]
+
+-- Отправка сообщения о назначении лута через addon-канал
+function SOTA_SendLootAssignMessage(itemId, winner)
+	if not SOTA_SendAddonMessage then return end
+	
+	local payload = string.format("itemId=%d;winner=%s", itemId, winner)
+	SOTA_SendAddonMessage("LOOT_ASSIGN", payload)
+end
 

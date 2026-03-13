@@ -1,0 +1,838 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/">
+
+<!-- Основное окно Loot Assistant -->
+<Frame name="SOTA_LootAssistantFrame" toplevel="true" frameStrata="DIALOG" movable="true" enableMouse="true" hidden="true" parent="UIParent">
+	<Size>
+		<AbsDimension x="450" y="500"/>
+	</Size>
+	<Anchors>
+		<Anchor point="CENTER"/>
+	</Anchors>
+	<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+		<BackgroundInsets>
+			<AbsInset left="11" right="12" top="12" bottom="11"/>
+		</BackgroundInsets>
+		<TileSize>
+			<AbsValue val="32"/>
+		</TileSize>
+		<EdgeSize>
+			<AbsValue val="32"/>
+		</EdgeSize>
+	</Backdrop>
+	
+	<Layers>
+		<!-- Заголовок -->
+		<Layer level="ARTWORK">
+			<Texture name="$parent_HeaderTexture" file="Interface\DialogFrame\UI-DialogBox-Header">
+				<Size>
+					<AbsDimension x="300" y="64"/>
+				</Size>
+				<Anchors>
+					<Anchor point="TOP">
+						<Offset>
+							<AbsDimension x="0" y="12"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</Texture>
+			<FontString name="$parent_Title" inherits="GameFontNormal">
+				<Anchors>
+					<Anchor point="TOP">
+						<Offset>
+							<AbsDimension x="0" y="-5"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</FontString>
+		</Layer>
+	</Layers>
+	
+	<!-- Кнопка закрытия -->
+	<Frames>
+		<Button name="$parent_CloseButton">
+			<Size>
+				<AbsDimension x="32" y="32"/>
+			</Size>
+			<Anchors>
+				<Anchor point="TOPRIGHT">
+					<Offset>
+						<AbsDimension x="-5" y="-5"/>
+					</Offset>
+				</Anchor>
+			</Anchors>
+			<Scripts>
+				<OnClick>
+					SOTA_LA_CloseWindow();
+				</OnClick>
+			</Scripts>
+			<NormalTexture file="Interface\Buttons\UI-Panel-MinimizeButton-Up"/>
+			<PushedTexture file="Interface\Buttons\UI-Panel-MinimizeButton-Down"/>
+			<HighlightTexture file="Interface\Buttons\UI-Panel-MinimizeButton-Highlight" alphaMode="ADD"/>
+		</Button>
+		
+	<!-- Список предметов (9 строк без скролла) -->
+	<Button name="SOTA_LootItem1">
+		<Size><AbsDimension x="400" y="40"/></Size>
+		<Anchors>
+			<Anchor point="TOPLEFT">
+				<Offset><AbsDimension x="20" y="-60"/></Offset>
+			</Anchor>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg">
+					<Color r="0.1" g="0.1" b="0.1" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentText" inherits="GameFontNormal" justifyH="LEFT">
+					<Size><AbsDimension x="250" y="40"/></Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset><AbsDimension x="10" y="0"/></Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parent_RollButton" inherits="GameMenuButtonTemplate" text="Разрол">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-155" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_GiveButton" inherits="GameMenuButtonTemplate" text="Выдать">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-85" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_RemoveButton" inherits="GameMenuButtonTemplate" text="X">
+				<Size><AbsDimension x="30" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-5" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
+	<Scripts>
+		<OnEnter>
+			if this.itemId and this.itemId ~= 0 then
+				GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+				GameTooltip:SetHyperlink("item:"..this.itemId..":0:0:0");
+				GameTooltip:Show();
+			end
+		</OnEnter>
+		<OnLeave>
+			GameTooltip:Hide();
+		</OnLeave>
+	</Scripts>
+	</Button>
+	
+	<Button name="SOTA_LootItem2">
+		<Size><AbsDimension x="400" y="40"/></Size>
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="SOTA_LootItem1" relativePoint="BOTTOMLEFT">
+				<Offset><AbsDimension x="0" y="-2"/></Offset>
+			</Anchor>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg">
+					<Color r="0.1" g="0.1" b="0.1" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentText" inherits="GameFontNormal" justifyH="LEFT">
+					<Size><AbsDimension x="250" y="40"/></Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset><AbsDimension x="10" y="0"/></Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parent_RollButton" inherits="GameMenuButtonTemplate" text="Разрол">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-155" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_GiveButton" inherits="GameMenuButtonTemplate" text="Выдать">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-85" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_RemoveButton" inherits="GameMenuButtonTemplate" text="X">
+				<Size><AbsDimension x="30" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-5" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
+	<Scripts>
+		<OnEnter>
+			if this.itemId and this.itemId ~= 0 then
+				GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+				GameTooltip:SetHyperlink("item:"..this.itemId..":0:0:0");
+				GameTooltip:Show();
+			end
+		</OnEnter>
+		<OnLeave>
+			GameTooltip:Hide();
+		</OnLeave>
+	</Scripts>
+	</Button>
+	
+	<Button name="SOTA_LootItem3">
+		<Size><AbsDimension x="400" y="40"/></Size>
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="SOTA_LootItem2" relativePoint="BOTTOMLEFT">
+				<Offset><AbsDimension x="0" y="-2"/></Offset>
+			</Anchor>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg">
+					<Color r="0.1" g="0.1" b="0.1" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentText" inherits="GameFontNormal" justifyH="LEFT">
+					<Size><AbsDimension x="250" y="40"/></Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset><AbsDimension x="10" y="0"/></Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parent_RollButton" inherits="GameMenuButtonTemplate" text="Разрол">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-155" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_GiveButton" inherits="GameMenuButtonTemplate" text="Выдать">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-85" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_RemoveButton" inherits="GameMenuButtonTemplate" text="X">
+				<Size><AbsDimension x="30" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-5" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
+	<Scripts>
+		<OnEnter>
+			if this.itemId and this.itemId ~= 0 then
+				GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+				GameTooltip:SetHyperlink("item:"..this.itemId..":0:0:0");
+				GameTooltip:Show();
+			end
+		</OnEnter>
+		<OnLeave>
+			GameTooltip:Hide();
+		</OnLeave>
+	</Scripts>
+	</Button>
+	
+	<Button name="SOTA_LootItem4">
+		<Size><AbsDimension x="400" y="40"/></Size>
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="SOTA_LootItem3" relativePoint="BOTTOMLEFT">
+				<Offset><AbsDimension x="0" y="-2"/></Offset>
+			</Anchor>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg">
+					<Color r="0.1" g="0.1" b="0.1" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentText" inherits="GameFontNormal" justifyH="LEFT">
+					<Size><AbsDimension x="250" y="40"/></Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset><AbsDimension x="10" y="0"/></Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parent_RollButton" inherits="GameMenuButtonTemplate" text="Разрол">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-155" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_GiveButton" inherits="GameMenuButtonTemplate" text="Выдать">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-85" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_RemoveButton" inherits="GameMenuButtonTemplate" text="X">
+				<Size><AbsDimension x="30" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-5" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
+	<Scripts>
+		<OnEnter>
+			if this.itemId and this.itemId ~= 0 then
+				GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+				GameTooltip:SetHyperlink("item:"..this.itemId..":0:0:0");
+				GameTooltip:Show();
+			end
+		</OnEnter>
+		<OnLeave>
+			GameTooltip:Hide();
+		</OnLeave>
+	</Scripts>
+	</Button>
+	
+	<Button name="SOTA_LootItem5">
+		<Size><AbsDimension x="400" y="40"/></Size>
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="SOTA_LootItem4" relativePoint="BOTTOMLEFT">
+				<Offset><AbsDimension x="0" y="-2"/></Offset>
+			</Anchor>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg">
+					<Color r="0.1" g="0.1" b="0.1" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentText" inherits="GameFontNormal" justifyH="LEFT">
+					<Size><AbsDimension x="250" y="40"/></Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset><AbsDimension x="10" y="0"/></Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parent_RollButton" inherits="GameMenuButtonTemplate" text="Разрол">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-155" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_GiveButton" inherits="GameMenuButtonTemplate" text="Выдать">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-85" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_RemoveButton" inherits="GameMenuButtonTemplate" text="X">
+				<Size><AbsDimension x="30" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-5" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
+	<Scripts>
+		<OnEnter>
+			if this.itemId and this.itemId ~= 0 then
+				GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+				GameTooltip:SetHyperlink("item:"..this.itemId..":0:0:0");
+				GameTooltip:Show();
+			end
+		</OnEnter>
+		<OnLeave>
+			GameTooltip:Hide();
+		</OnLeave>
+	</Scripts>
+	</Button>
+	
+	<Button name="SOTA_LootItem6">
+		<Size><AbsDimension x="400" y="40"/></Size>
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="SOTA_LootItem5" relativePoint="BOTTOMLEFT">
+				<Offset><AbsDimension x="0" y="-2"/></Offset>
+			</Anchor>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg">
+					<Color r="0.1" g="0.1" b="0.1" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentText" inherits="GameFontNormal" justifyH="LEFT">
+					<Size><AbsDimension x="250" y="40"/></Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset><AbsDimension x="10" y="0"/></Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parent_RollButton" inherits="GameMenuButtonTemplate" text="Разрол">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-155" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_GiveButton" inherits="GameMenuButtonTemplate" text="Выдать">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-85" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_RemoveButton" inherits="GameMenuButtonTemplate" text="X">
+				<Size><AbsDimension x="30" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-5" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
+	<Scripts>
+		<OnEnter>
+			if this.itemId and this.itemId ~= 0 then
+				GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+				GameTooltip:SetHyperlink("item:"..this.itemId..":0:0:0");
+				GameTooltip:Show();
+			end
+		</OnEnter>
+		<OnLeave>
+			GameTooltip:Hide();
+		</OnLeave>
+	</Scripts>
+	</Button>
+	
+	<Button name="SOTA_LootItem7">
+		<Size><AbsDimension x="400" y="40"/></Size>
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="SOTA_LootItem6" relativePoint="BOTTOMLEFT">
+				<Offset><AbsDimension x="0" y="-2"/></Offset>
+			</Anchor>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg">
+					<Color r="0.1" g="0.1" b="0.1" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentText" inherits="GameFontNormal" justifyH="LEFT">
+					<Size><AbsDimension x="250" y="40"/></Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset><AbsDimension x="10" y="0"/></Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parent_RollButton" inherits="GameMenuButtonTemplate" text="Разрол">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-155" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_GiveButton" inherits="GameMenuButtonTemplate" text="Выдать">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-85" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_RemoveButton" inherits="GameMenuButtonTemplate" text="X">
+				<Size><AbsDimension x="30" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-5" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
+	<Scripts>
+		<OnEnter>
+			if this.itemId and this.itemId ~= 0 then
+				GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+				GameTooltip:SetHyperlink("item:"..this.itemId..":0:0:0");
+				GameTooltip:Show();
+			end
+		</OnEnter>
+		<OnLeave>
+			GameTooltip:Hide();
+		</OnLeave>
+	</Scripts>
+	</Button>
+	
+	<Button name="SOTA_LootItem8">
+		<Size><AbsDimension x="400" y="40"/></Size>
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="SOTA_LootItem7" relativePoint="BOTTOMLEFT">
+				<Offset><AbsDimension x="0" y="-2"/></Offset>
+			</Anchor>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg">
+					<Color r="0.1" g="0.1" b="0.1" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentText" inherits="GameFontNormal" justifyH="LEFT">
+					<Size><AbsDimension x="250" y="40"/></Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset><AbsDimension x="10" y="0"/></Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parent_RollButton" inherits="GameMenuButtonTemplate" text="Разрол">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-155" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_GiveButton" inherits="GameMenuButtonTemplate" text="Выдать">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-85" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_RemoveButton" inherits="GameMenuButtonTemplate" text="X">
+				<Size><AbsDimension x="30" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-5" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
+	<Scripts>
+		<OnEnter>
+			if this.itemId and this.itemId ~= 0 then
+				GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+				GameTooltip:SetHyperlink("item:"..this.itemId..":0:0:0");
+				GameTooltip:Show();
+			end
+		</OnEnter>
+		<OnLeave>
+			GameTooltip:Hide();
+		</OnLeave>
+	</Scripts>
+	</Button>
+	
+	<Button name="SOTA_LootItem9">
+		<Size><AbsDimension x="400" y="40"/></Size>
+		<Anchors>
+			<Anchor point="TOPLEFT" relativeTo="SOTA_LootItem8" relativePoint="BOTTOMLEFT">
+				<Offset><AbsDimension x="0" y="-2"/></Offset>
+			</Anchor>
+		</Anchors>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture name="$parentBg">
+					<Color r="0.1" g="0.1" b="0.1" a="0.5"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentText" inherits="GameFontNormal" justifyH="LEFT">
+					<Size><AbsDimension x="250" y="40"/></Size>
+					<Anchors>
+						<Anchor point="LEFT">
+							<Offset><AbsDimension x="10" y="0"/></Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="1" b="1"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<Button name="$parent_RollButton" inherits="GameMenuButtonTemplate" text="Разрол">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-155" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_GiveButton" inherits="GameMenuButtonTemplate" text="Выдать">
+				<Size><AbsDimension x="60" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-85" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+			<Button name="$parent_RemoveButton" inherits="GameMenuButtonTemplate" text="X">
+				<Size><AbsDimension x="30" y="22"/></Size>
+				<Anchors>
+					<Anchor point="RIGHT">
+						<Offset><AbsDimension x="-5" y="0"/></Offset>
+					</Anchor>
+				</Anchors>
+			</Button>
+		</Frames>
+	<Scripts>
+		<OnEnter>
+			if this.itemId and this.itemId ~= 0 then
+				GameTooltip:SetOwner(this, "ANCHOR_RIGHT");
+				GameTooltip:SetHyperlink("item:"..this.itemId..":0:0:0");
+				GameTooltip:Show();
+			end
+		</OnEnter>
+		<OnLeave>
+			GameTooltip:Hide();
+		</OnLeave>
+	</Scripts>
+	</Button>
+		
+	<!-- Кнопки управления внизу -->
+	<Button name="$parent_RollFirstButton" inherits="GameMenuButtonTemplate" text="Разрол">
+		<Size>
+			<AbsDimension x="120" y="30"/>
+		</Size>
+		<Anchors>
+			<Anchor point="BOTTOMLEFT">
+				<Offset>
+					<AbsDimension x="20" y="15"/>
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnClick>
+				SOTA_LA_StartFirstPending();
+			</OnClick>
+		</Scripts>
+	</Button>
+
+	<Button name="$parent_GiveAllButton" inherits="GameMenuButtonTemplate" text="Выдать">
+		<Size>
+			<AbsDimension x="120" y="30"/>
+		</Size>
+		<Anchors>
+			<Anchor point="BOTTOM">
+				<Offset>
+					<AbsDimension x="0" y="15"/>
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnClick>
+				SOTA_LA_GiveAll();
+			</OnClick>
+		</Scripts>
+	</Button>
+
+	<Button name="$parent_CloseBottomButton" inherits="GameMenuButtonTemplate" text="Закрыть">
+		<Size>
+			<AbsDimension x="100" y="30"/>
+		</Size>
+		<Anchors>
+			<Anchor point="BOTTOMRIGHT">
+				<Offset>
+					<AbsDimension x="-20" y="15"/>
+				</Offset>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnClick>
+				SOTA_LA_CloseWindow();
+			</OnClick>
+		</Scripts>
+	</Button>
+		
+	</Frames>
+	
+	<Scripts>
+		<OnLoad>
+			getglobal(this:GetName().."_Title"):SetText("DKP Loot Assistant");
+			this:RegisterEvent("LOOT_OPENED");
+			this:RegisterEvent("LOOT_SLOT_CLEARED");
+			this:RegisterEvent("LOOT_CLOSED");
+			this:RegisterEvent("TRADE_SHOW");
+			this:RegisterEvent("TRADE_ACCEPT_UPDATE");
+			this:RegisterEvent("TRADE_CLOSED");
+			this:RegisterForDrag("LeftButton");
+		</OnLoad>
+		<OnEvent>
+			SOTA_LA_OnEvent(event);
+		</OnEvent>
+		<OnShow>
+			SOTA_LA_RefreshList();
+		</OnShow>
+		<OnDragStart>
+			this:StartMoving();
+		</OnDragStart>
+		<OnDragStop>
+			this:StopMovingOrSizing();
+		</OnDragStop>
+	</Scripts>
+</Frame>
+
+<!-- Trade Helper окно -->
+<Frame name="SOTA_LA_TradeHelperFrame" toplevel="true" frameStrata="DIALOG" movable="true" enableMouse="true" hidden="true" parent="UIParent">
+	<Size>
+		<AbsDimension x="300" y="200"/>
+	</Size>
+	<Anchors>
+		<Anchor point="CENTER"/>
+	</Anchors>
+	<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+		<BackgroundInsets>
+			<AbsInset left="11" right="12" top="12" bottom="11"/>
+		</BackgroundInsets>
+		<TileSize>
+			<AbsValue val="32"/>
+		</TileSize>
+		<EdgeSize>
+			<AbsValue val="32"/>
+		</EdgeSize>
+	</Backdrop>
+	
+	<Layers>
+		<Layer level="ARTWORK">
+			<FontString name="$parent_Title" inherits="GameFontNormal">
+				<Anchors>
+					<Anchor point="TOP">
+						<Offset>
+							<AbsDimension x="0" y="-15"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</FontString>
+			
+			<FontString name="$parent_Info" inherits="GameFontNormalSmall" justifyH="LEFT">
+				<Size>
+					<AbsDimension x="260" y="0"/>
+				</Size>
+				<Anchors>
+					<Anchor point="TOP">
+						<Offset>
+							<AbsDimension x="0" y="-40"/>
+						</Offset>
+					</Anchor>
+				</Anchors>
+			</FontString>
+		</Layer>
+	</Layers>
+	
+	<Frames>
+		<Button name="$parent_GiveAllButton" inherits="GameMenuButtonTemplate" text="Выдать Всё">
+			<Size>
+				<AbsDimension x="120" y="30"/>
+			</Size>
+			<Anchors>
+				<Anchor point="BOTTOM">
+					<Offset>
+						<AbsDimension x="-60" y="15"/>
+					</Offset>
+				</Anchor>
+			</Anchors>
+		</Button>
+		
+		<Button name="$parent_CloseButton" inherits="GameMenuButtonTemplate" text="Закрыть">
+			<Size>
+				<AbsDimension x="100" y="30"/>
+			</Size>
+			<Anchors>
+				<Anchor point="BOTTOM">
+					<Offset>
+						<AbsDimension x="60" y="15"/>
+					</Offset>
+				</Anchor>
+			</Anchors>
+			<Scripts>
+				<OnClick>
+					this:GetParent():Hide();
+				</OnClick>
+			</Scripts>
+		</Button>
+	</Frames>
+	
+	<Scripts>
+		<OnLoad>
+			getglobal(this:GetName().."_Title"):SetText("Выдача Лута");
+			this:RegisterForDrag("LeftButton");
+		</OnLoad>
+		<OnDragStart>
+			this:StartMoving();
+		</OnDragStart>
+		<OnDragStop>
+			this:StopMovingOrSizing();
+		</OnDragStop>
+	</Scripts>
+</Frame>
+
+<Script file="sota-lootassistant.lua"/>
+
+</Ui>
