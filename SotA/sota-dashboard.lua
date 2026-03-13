@@ -806,6 +806,22 @@ function SOTA_ToggleDKPNotesMode()
 end
 
 --[[
+--	Toggle Loot Assistant window
+--]]
+function SOTA_ToggleLootAssistant()
+	local frame = getglobal("SOTA_LootAssistantFrame")
+	if frame then
+		if frame:IsVisible() then
+			SOTA_LA_CloseWindow()
+		else
+			SOTA_LA_OpenWindow()
+		end
+	else
+		localEcho("[SOTA] Loot Assistant не загружен!")
+	end
+end
+
+--[[
 --	Показывает tooltip для кнопки переключения DKP Notes
 --]]
 function SOTA_ShowDKPNotesTooltip(object)

@@ -172,12 +172,9 @@ local SOTA_CONFIG_DEFAULT_BossDKP = {
 -- Формат: { ItemType, BWL, AQ40, NAXX, KARA40 }
 SOTA_CONFIG_ItemDKP				= { }
 local SOTA_CONFIG_DEFAULT_ItemDKP = {
-	{ "Одежда",		200, 400, 100, 400 },
-	{ "Пушка",		500, 500, 300, 500 },
-	{ "Ванда",		500, 500, 300, 500 },
-	{ "Кольца",		500, 900, 500, 900 },
-	{ "Тринкет",	300, 500, 300, 500 },
-	{ "Прочее",		200, 500, 500, 500 }
+	{ "Одежда",		200, 300, 400, 200 },
+	{ "Оружие",		300, 500, 900, 300 },
+	{ "Аксессуары",	300, 500, 900, 300 }
 }
 
 -- Pane 3:
@@ -836,6 +833,15 @@ function SOTA_GetBossDKPList()
 end
 
 function SOTA_GetItemDKPList()
+	-- Проверяем, нужна ли миграция со старой структуры (6 категорий) на новую (3 категории)
+	if SOTA_CONFIG_ItemDKP and table.getn(SOTA_CONFIG_ItemDKP) == 6 then
+		if SOTA_LA_DebugMode then
+			localEcho("[LA DEBUG] Обнаружена старая структура ItemDKP (6 категорий), мигрируем на новую (3 категории)")
+		end
+		-- Сбрасываем на дефолт
+		SOTA_CONFIG_ItemDKP = nil;
+	end
+	
 	if not SOTA_CONFIG_ItemDKP or table.getn(SOTA_CONFIG_ItemDKP) == 0 then
 		-- Клонируем дефолтные значения, чтобы не изменять исходную таблицу
 		SOTA_CONFIG_ItemDKP = {};
@@ -859,20 +865,97 @@ function SOTA_GetItemDKPValue(itemType, raidType)
 	local raidIndex = 2;  -- По умолчанию BWL
 	if raidType == "AQ40" then
 		raidIndex = 3;
-	elseif raidType == "NAXX" then
+	elseif raidType == "NAXX" or raidType == "Naxxramas" then
 		raidIndex = 4;
-	elseif raidType == "KARA40" then
+	elseif raidType == "KARA40" or raidType == "UpperKarazhan" then
 		raidIndex = 5;
+	elseif raidType == "BlackwingLair" then
+		raidIndex = 2;
+	end
+	
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] SOTA_GetItemDKPValue: itemType='%s', raidType='%s', raidIndex=%d", 
+			tostring(itemType), tostring(raidType), raidIndex))
 	end
 	
 	-- Ищем тип предмета
 	for n=1, table.getn(itemDkpList), 1 do
 		if itemDkpList[n][1] == itemType then
-			return tonumber(itemDkpList[n][raidIndex]);
+			local value = tonumber(itemDkpList[n][raidIndex])
+			if SOTA_LA_DebugMode then
+				localEcho(string.format("[LA DEBUG] Найдено совпадение: itemDkpList[%d][1]='%s', value=%s", 
+					n, tostring(itemDkpList[n][1]), tostring(value)))
+			end
+			return value
 		end
 	end
 	
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] Тип предмета '%s' не найден в таблице, возврат 0", tostring(itemType)))
+	end
+	
 	return 0;
+end
+
+function SOTA_GetItemTypeBySlot(itemId)
+	-- Принимаем itemId (число) вместо itemLink
+	if not itemId or itemId == 0 then
+		if SOTA_LA_DebugMode then
+			localEcho("[LA DEBUG] GetItemTypeBySlot: itemId невалидный, возврат 'Прочее'")
+		end
+		return "Прочее"
+	end
+	
+	-- Вызываем GetItemInfo с itemId (числом)
+	-- РЕАЛЬНЫЙ порядок для Classic 1.12:
+	-- v1=name, v2=link, v3=rarity, v4=level, v5=itemType, v6=itemSubType, 
+	-- v7=stackCount, v8=equipLoc, v9=texture, v10=sellPrice
+	local itemName, itemLink, itemRarity, itemLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, itemSellPrice = GetItemInfo(itemId)
+	
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] GetItemTypeBySlot: itemId=%d, name=%s, itemType=%s, itemSubType=%s, equipLoc=%s", 
+			itemId, tostring(itemName), tostring(itemType), tostring(itemSubType), tostring(itemEquipLoc)))
+	end
+	
+	-- Если GetItemInfo вернул nil (предмет не закеширован), возвращаем "Прочее"
+	if not itemEquipLoc or itemEquipLoc == "" then 
+		if SOTA_LA_DebugMode then
+			localEcho("[LA DEBUG] itemEquipLoc пустой или nil, возврат 'Прочее' (по умолчанию)")
+		end
+		return "Прочее"
+	end
+	
+	local result = nil
+	
+	-- Маппинг слотов на типы из ItemDKP (упрощенная таблица)
+	if itemEquipLoc == "INVTYPE_HEAD" or itemEquipLoc == "INVTYPE_SHOULDER" or 
+	   itemEquipLoc == "INVTYPE_CHEST" or itemEquipLoc == "INVTYPE_WAIST" or
+	   itemEquipLoc == "INVTYPE_LEGS" or itemEquipLoc == "INVTYPE_FEET" or
+	   itemEquipLoc == "INVTYPE_WRIST" or itemEquipLoc == "INVTYPE_HAND" or
+	   itemEquipLoc == "INVTYPE_CLOAK" or itemEquipLoc == "INVTYPE_ROBE" or
+	   itemEquipLoc == "INVTYPE_BODY" then
+		result = "Одежда"
+	elseif itemEquipLoc == "INVTYPE_FINGER" or itemEquipLoc == "INVTYPE_NECK" or
+	       itemEquipLoc == "INVTYPE_TRINKET" then
+		-- Кольца, шея, тринкеты
+		result = "Аксессуары"
+	elseif itemEquipLoc == "INVTYPE_WEAPON" or itemEquipLoc == "INVTYPE_2HWEAPON" or
+	       itemEquipLoc == "INVTYPE_WEAPONMAINHAND" or itemEquipLoc == "INVTYPE_WEAPONOFFHAND" or
+	       itemEquipLoc == "INVTYPE_RANGED" or itemEquipLoc == "INVTYPE_RANGEDRIGHT" or
+	       itemEquipLoc == "INVTYPE_THROWN" or itemEquipLoc == "INVTYPE_SHIELD" or
+	       itemEquipLoc == "INVTYPE_HOLDABLE" or itemEquipLoc == "INVTYPE_RANGEDWAND" then
+		-- ВСЁ оружие: пушки, щиты, ванды, либрамы, луки, мечи и т.д.
+		result = "Оружие"
+	else
+		-- Всё остальное (квесты, расходники) - используем цену одежды
+		result = "Одежда"
+	end
+	
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] GetItemTypeBySlot: результат = %s", tostring(result)))
+	end
+	
+	return result
 end
 
 function SOTA_SetItemDKPValue(itemType, raidType, dkpValue)
@@ -893,6 +976,72 @@ function SOTA_SetItemDKPValue(itemType, raidType, dkpValue)
 			break;
 		end
 	end
+end
+
+function SOTA_GetItemPriceForAuction(itemLink)
+	-- Определяем текущую зону
+	local zonetext = GetRealZoneText()
+	local raidType = nil
+	
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] GetItemPriceForAuction: zonetext='%s'", tostring(zonetext)))
+	end
+	
+	if zonetext == "Blackwing Lair" then
+		raidType = "BlackwingLair"
+	elseif zonetext == "Ahn'Qiraj" then
+		raidType = "AQ40"
+	elseif zonetext == "Naxxramas" then
+		raidType = "Naxxramas"
+	elseif zonetext == "Tower of Karazhan" or zonetext == "The Rock of Desolation" then
+		raidType = "UpperKarazhan"
+	end
+	
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] GetItemPriceForAuction: raidType='%s'", tostring(raidType)))
+	end
+	
+	-- Если не в особой зоне - используем MinBid из настроек
+	if not raidType then
+		local minBid = SOTA_GetMinimumBid() or 100
+		if SOTA_LA_DebugMode then
+			localEcho(string.format("[LA DEBUG] Не в особой зоне, используем MinBid=%d", minBid))
+		end
+		return minBid
+	end
+	
+	-- Извлекаем itemId из itemLink
+	local itemId = tonumber(string.match(itemLink, "item:(%d+)"))
+	
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] Извлечен itemId=%s из itemLink", tostring(itemId)))
+	end
+	
+	-- Определяем тип предмета по itemId
+	local itemType = SOTA_GetItemTypeBySlot(itemId)
+	-- itemType теперь всегда возвращает значение (минимум "Прочее")
+	
+	-- Получаем цену из таблицы ItemDKP
+	local price = SOTA_GetItemDKPValue(itemType, raidType)
+	
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] SOTA_GetItemDKPValue('%s', '%s') = %s", 
+			tostring(itemType), tostring(raidType), tostring(price)))
+	end
+	
+	if price and price > 0 then
+		if SOTA_LA_DebugMode then
+			localEcho(string.format("[LA DEBUG] Используем цену из ItemDKP: %d", price))
+		end
+		return price
+	end
+	
+	-- Fallback на MinBid
+	local minBid = SOTA_GetMinimumBid() or 100
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] Fallback на MinBid=%d", minBid))
+	end
+	return minBid
 end
 
 function SOTA_Call_CheckPlayerDKP(playername, sender)

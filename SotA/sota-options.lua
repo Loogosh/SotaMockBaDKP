@@ -394,72 +394,40 @@ function SOTA_RefreshItemDKPValues()
 		frame = getglobal("FrameConfigItemDkp_Cloth_BWL");
 		if frame then frame:SetText(itemList[1][2] or 200); end
 		frame = getglobal("FrameConfigItemDkp_Cloth_AQ40");
-		if frame then frame:SetText(itemList[1][3] or 400); end
+		if frame then frame:SetText(itemList[1][3] or 300); end
 		frame = getglobal("FrameConfigItemDkp_Cloth_NAXX");
-		if frame then frame:SetText(itemList[1][4] or 100); end
+		if frame then frame:SetText(itemList[1][4] or 400); end
 		frame = getglobal("FrameConfigItemDkp_Cloth_KARA");
-		if frame then frame:SetText(itemList[1][5] or 400); end
+		if frame then frame:SetText(itemList[1][5] or 200); end
 	end
 	
-	-- Пушка
+	-- Оружие
 	if itemList[2] then
-		frame = getglobal("FrameConfigItemDkp_Gun_BWL");
-		if frame then frame:SetText(itemList[2][2] or 500); end
-		frame = getglobal("FrameConfigItemDkp_Gun_AQ40");
+		frame = getglobal("FrameConfigItemDkp_Weapon_BWL");
+		if frame then frame:SetText(itemList[2][2] or 300); end
+		frame = getglobal("FrameConfigItemDkp_Weapon_AQ40");
 		if frame then frame:SetText(itemList[2][3] or 500); end
-		frame = getglobal("FrameConfigItemDkp_Gun_NAXX");
-		if frame then frame:SetText(itemList[2][4] or 300); end
-		frame = getglobal("FrameConfigItemDkp_Gun_KARA");
-		if frame then frame:SetText(itemList[2][5] or 500); end
+		frame = getglobal("FrameConfigItemDkp_Weapon_NAXX");
+		if frame then frame:SetText(itemList[2][4] or 900); end
+		frame = getglobal("FrameConfigItemDkp_Weapon_KARA");
+		if frame then frame:SetText(itemList[2][5] or 300); end
 	end
 	
-	-- Ванда
+	-- Аксессуары
 	if itemList[3] then
-		frame = getglobal("FrameConfigItemDkp_Wand_BWL");
-		if frame then frame:SetText(itemList[3][2] or 500); end
-		frame = getglobal("FrameConfigItemDkp_Wand_AQ40");
+		frame = getglobal("FrameConfigItemDkp_Accessory_BWL");
+		if frame then frame:SetText(itemList[3][2] or 300); end
+		frame = getglobal("FrameConfigItemDkp_Accessory_AQ40");
 		if frame then frame:SetText(itemList[3][3] or 500); end
-		frame = getglobal("FrameConfigItemDkp_Wand_NAXX");
-		if frame then frame:SetText(itemList[3][4] or 300); end
-		frame = getglobal("FrameConfigItemDkp_Wand_KARA");
-		if frame then frame:SetText(itemList[3][5] or 500); end
+		frame = getglobal("FrameConfigItemDkp_Accessory_NAXX");
+		if frame then frame:SetText(itemList[3][4] or 900); end
+		frame = getglobal("FrameConfigItemDkp_Accessory_KARA");
+		if frame then frame:SetText(itemList[3][5] or 300); end
 	end
 	
-	-- Кольца
-	if itemList[4] then
-		frame = getglobal("FrameConfigItemDkp_Ring_BWL");
-		if frame then frame:SetText(itemList[4][2] or 500); end
-		frame = getglobal("FrameConfigItemDkp_Ring_AQ40");
-		if frame then frame:SetText(itemList[4][3] or 900); end
-		frame = getglobal("FrameConfigItemDkp_Ring_NAXX");
-		if frame then frame:SetText(itemList[4][4] or 500); end
-		frame = getglobal("FrameConfigItemDkp_Ring_KARA");
-		if frame then frame:SetText(itemList[4][5] or 900); end
-	end
-	
-	-- Тринкет
-	if itemList[5] then
-		frame = getglobal("FrameConfigItemDkp_Trinket_BWL");
-		if frame then frame:SetText(itemList[5][2] or 300); end
-		frame = getglobal("FrameConfigItemDkp_Trinket_AQ40");
-		if frame then frame:SetText(itemList[5][3] or 500); end
-		frame = getglobal("FrameConfigItemDkp_Trinket_NAXX");
-		if frame then frame:SetText(itemList[5][4] or 300); end
-		frame = getglobal("FrameConfigItemDkp_Trinket_KARA");
-		if frame then frame:SetText(itemList[5][5] or 500); end
-	end
-	
-	-- Прочее
-	if itemList[6] then
-		frame = getglobal("FrameConfigItemDkp_Other_BWL");
-		if frame then frame:SetText(itemList[6][2] or 200); end
-		frame = getglobal("FrameConfigItemDkp_Other_AQ40");
-		if frame then frame:SetText(itemList[6][3] or 500); end
-		frame = getglobal("FrameConfigItemDkp_Other_NAXX");
-		if frame then frame:SetText(itemList[6][4] or 500); end
-		frame = getglobal("FrameConfigItemDkp_Other_KARA");
-		if frame then frame:SetText(itemList[6][5] or 500); end
-	end
+	-- Минимальное качество для Loot Assistant
+	frame = getglobal("FrameConfigItemDkp_MinQuality");
+	if frame then frame:SetText(SOTA_CONFIG_LA_MinQuality or 4); end
 end
 
 function SOTA_SaveItemDKPValues()
@@ -503,74 +471,48 @@ function SOTA_SaveItemDKPValues()
 		frame = getglobal("FrameConfigItemDkp_Cloth_BWL");
 		if frame then itemList[1][2] = tonumber(frame:GetText()) or 200; end
 		frame = getglobal("FrameConfigItemDkp_Cloth_AQ40");
-		if frame then itemList[1][3] = tonumber(frame:GetText()) or 400; end
+		if frame then itemList[1][3] = tonumber(frame:GetText()) or 300; end
 		frame = getglobal("FrameConfigItemDkp_Cloth_NAXX");
-		if frame then itemList[1][4] = tonumber(frame:GetText()) or 100; end
+		if frame then itemList[1][4] = tonumber(frame:GetText()) or 400; end
 		frame = getglobal("FrameConfigItemDkp_Cloth_KARA");
-		if frame then itemList[1][5] = tonumber(frame:GetText()) or 400; end
+		if frame then itemList[1][5] = tonumber(frame:GetText()) or 200; end
 	end
 	
-	-- Пушка
+	-- Оружие
 	if itemList[2] then
-		frame = getglobal("FrameConfigItemDkp_Gun_BWL");
-		if frame then itemList[2][2] = tonumber(frame:GetText()) or 500; end
-		frame = getglobal("FrameConfigItemDkp_Gun_AQ40");
+		frame = getglobal("FrameConfigItemDkp_Weapon_BWL");
+		if frame then itemList[2][2] = tonumber(frame:GetText()) or 300; end
+		frame = getglobal("FrameConfigItemDkp_Weapon_AQ40");
 		if frame then itemList[2][3] = tonumber(frame:GetText()) or 500; end
-		frame = getglobal("FrameConfigItemDkp_Gun_NAXX");
-		if frame then itemList[2][4] = tonumber(frame:GetText()) or 300; end
-		frame = getglobal("FrameConfigItemDkp_Gun_KARA");
-		if frame then itemList[2][5] = tonumber(frame:GetText()) or 500; end
+		frame = getglobal("FrameConfigItemDkp_Weapon_NAXX");
+		if frame then itemList[2][4] = tonumber(frame:GetText()) or 900; end
+		frame = getglobal("FrameConfigItemDkp_Weapon_KARA");
+		if frame then itemList[2][5] = tonumber(frame:GetText()) or 300; end
 	end
 	
-	-- Ванда
+	-- Аксессуары
 	if itemList[3] then
-		frame = getglobal("FrameConfigItemDkp_Wand_BWL");
-		if frame then itemList[3][2] = tonumber(frame:GetText()) or 500; end
-		frame = getglobal("FrameConfigItemDkp_Wand_AQ40");
+		frame = getglobal("FrameConfigItemDkp_Accessory_BWL");
+		if frame then itemList[3][2] = tonumber(frame:GetText()) or 300; end
+		frame = getglobal("FrameConfigItemDkp_Accessory_AQ40");
 		if frame then itemList[3][3] = tonumber(frame:GetText()) or 500; end
-		frame = getglobal("FrameConfigItemDkp_Wand_NAXX");
-		if frame then itemList[3][4] = tonumber(frame:GetText()) or 300; end
-		frame = getglobal("FrameConfigItemDkp_Wand_KARA");
-		if frame then itemList[3][5] = tonumber(frame:GetText()) or 500; end
-	end
-	
-	-- Кольца
-	if itemList[4] then
-		frame = getglobal("FrameConfigItemDkp_Ring_BWL");
-		if frame then itemList[4][2] = tonumber(frame:GetText()) or 500; end
-		frame = getglobal("FrameConfigItemDkp_Ring_AQ40");
-		if frame then itemList[4][3] = tonumber(frame:GetText()) or 900; end
-		frame = getglobal("FrameConfigItemDkp_Ring_NAXX");
-		if frame then itemList[4][4] = tonumber(frame:GetText()) or 500; end
-		frame = getglobal("FrameConfigItemDkp_Ring_KARA");
-		if frame then itemList[4][5] = tonumber(frame:GetText()) or 900; end
-	end
-	
-	-- Тринкет
-	if itemList[5] then
-		frame = getglobal("FrameConfigItemDkp_Trinket_BWL");
-		if frame then itemList[5][2] = tonumber(frame:GetText()) or 300; end
-		frame = getglobal("FrameConfigItemDkp_Trinket_AQ40");
-		if frame then itemList[5][3] = tonumber(frame:GetText()) or 500; end
-		frame = getglobal("FrameConfigItemDkp_Trinket_NAXX");
-		if frame then itemList[5][4] = tonumber(frame:GetText()) or 300; end
-		frame = getglobal("FrameConfigItemDkp_Trinket_KARA");
-		if frame then itemList[5][5] = tonumber(frame:GetText()) or 500; end
-	end
-	
-	-- Прочее
-	if itemList[6] then
-		frame = getglobal("FrameConfigItemDkp_Other_BWL");
-		if frame then itemList[6][2] = tonumber(frame:GetText()) or 200; end
-		frame = getglobal("FrameConfigItemDkp_Other_AQ40");
-		if frame then itemList[6][3] = tonumber(frame:GetText()) or 500; end
-		frame = getglobal("FrameConfigItemDkp_Other_NAXX");
-		if frame then itemList[6][4] = tonumber(frame:GetText()) or 500; end
-		frame = getglobal("FrameConfigItemDkp_Other_KARA");
-		if frame then itemList[6][5] = tonumber(frame:GetText()) or 500; end
+		frame = getglobal("FrameConfigItemDkp_Accessory_NAXX");
+		if frame then itemList[3][4] = tonumber(frame:GetText()) or 900; end
+		frame = getglobal("FrameConfigItemDkp_Accessory_KARA");
+		if frame then itemList[3][5] = tonumber(frame:GetText()) or 300; end
 	end
 	
 	SOTA_CONFIG_ItemDKP = itemList;
+	
+	-- Сохраняем минимальное качество для Loot Assistant
+	frame = getglobal("FrameConfigItemDkp_MinQuality");
+	if frame then
+		local value = tonumber(frame:GetText()) or 4;
+		if value < 0 then value = 0 end
+		if value > 5 then value = 5 end
+		SOTA_CONFIG_LA_MinQuality = value;
+	end
+	
 	localEcho("Item DKP настройки сохранены!");
 end
 

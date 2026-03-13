@@ -585,200 +585,136 @@
 					</Anchors>
 				</FontString>
 				
-				<!-- Названия типов предметов -->
-				<FontString inherits="GameFontNormal" text="Одежда">
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset x="28" y="-115"/>
-						</Anchor>
-					</Anchors>
-				</FontString>
-				<FontString inherits="GameFontNormal" text="Пушка/Офф">
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset x="28" y="-147"/>
-						</Anchor>
-					</Anchors>
-				</FontString>
-				<FontString inherits="GameFontNormal" text="Ванда/Лук">
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset x="28" y="-179"/>
-						</Anchor>
-					</Anchors>
-				</FontString>
-				<FontString inherits="GameFontNormal" text="Кольца/Шея">
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset x="28" y="-211"/>
-						</Anchor>
-					</Anchors>
-				</FontString>
-				<FontString inherits="GameFontNormal" text="Тринкет">
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset x="28" y="-243"/>
-						</Anchor>
-					</Anchors>
-				</FontString>
-				<FontString inherits="GameFontNormal" text="Прочее">
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset x="28" y="-275"/>
-						</Anchor>
-					</Anchors>
-				</FontString>
-			</Layer>
-		</Layers>
-		<Frames>
-			<!-- Одежда: BWL, AQ40, NAXX, KARA -->
-			<EditBox name="$parent_Cloth_BWL" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="150" y="-112"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Cloth_AQ40" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="200" y="-112"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Cloth_NAXX" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="250" y="-112"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Cloth_KARA" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="300" y="-112"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			
-			<!-- Пушка: BWL, AQ40, NAXX, KARA -->
-			<EditBox name="$parent_Gun_BWL" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="150" y="-144"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Gun_AQ40" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="200" y="-144"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Gun_NAXX" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="250" y="-144"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Gun_KARA" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="300" y="-144"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			
-			<!-- Ванда: BWL, AQ40, NAXX, KARA -->
-			<EditBox name="$parent_Wand_BWL" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="150" y="-176"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Wand_AQ40" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="200" y="-176"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Wand_NAXX" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="250" y="-176"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Wand_KARA" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="300" y="-176"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			
-			<!-- Кольца: BWL, AQ40, NAXX, KARA -->
-			<EditBox name="$parent_Ring_BWL" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="150" y="-208"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Ring_AQ40" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="200" y="-208"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Ring_NAXX" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="250" y="-208"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Ring_KARA" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="300" y="-208"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			
-			<!-- Тринкет: BWL, AQ40, NAXX, KARA -->
-			<EditBox name="$parent_Trinket_BWL" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="150" y="-240"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Trinket_AQ40" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="200" y="-240"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Trinket_NAXX" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="250" y="-240"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Trinket_KARA" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="300" y="-240"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			
-			<!-- Прочее: BWL, AQ40, NAXX, KARA -->
-			<EditBox name="$parent_Other_BWL" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="150" y="-272"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Other_AQ40" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="200" y="-272"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Other_NAXX" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="250" y="-272"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			<EditBox name="$parent_Other_KARA" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
-				<Size><AbsDimension x="40" y="20"/></Size>
-				<Anchors><Anchor point="TOPLEFT"><Offset x="300" y="-272"/></Anchor></Anchors>
-				<FontString inherits="ChatFontNormal"/>
-			</EditBox>
-			
-			<!-- Кнопка сохранения Item DKP -->
-			<Button name="$parentSaveButton" inherits="UIPanelButtonTemplate" text="Сохранить">
-				<Size>
-					<AbsDimension x="100" y="23" />
-				</Size>
+			<!-- Названия типов предметов -->
+			<FontString inherits="GameFontNormal" text="Одежда / Тир">
 				<Anchors>
 					<Anchor point="TOPLEFT">
-						<Offset x="134" y="-320"/>
+						<Offset x="28" y="-115"/>
 					</Anchor>
 				</Anchors>
-				<Scripts>
-					<OnClick>
-						SOTA_SaveItemDKPValues();
-					</OnClick>
-				</Scripts>
-			</Button>
+			</FontString>
+			<FontString inherits="GameFontNormal" text="Оружие">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="28" y="-147"/>
+					</Anchor>
+				</Anchors>
+			</FontString>
+			<FontString inherits="GameFontNormal" text="Аксессуары">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="28" y="-179"/>
+					</Anchor>
+				</Anchors>
+			</FontString>
+		
+		<!-- Минимальное качество для Loot Assistant -->
+		<FontString inherits="GameFontNormal" text="Мин. качество (LA):">
+			<Anchors>
+				<Anchor point="TOPLEFT">
+					<Offset x="28" y="-220"/>
+				</Anchor>
+			</Anchors>
+		</FontString>
+		<FontString inherits="GameFontNormalSmall" text="0-серые, 1-белые, 2-зелёные, 3-синие, 4-эпики, 5-легенды">
+			<Anchors>
+				<Anchor point="TOPLEFT">
+					<Offset x="75" y="-235"/>
+				</Anchor>
+			</Anchors>
+		</FontString>
+		</Layer>
+	</Layers>
+	<Frames>
+		<!-- Одежда: BWL, AQ40, NAXX, KARA -->
+		<EditBox name="$parent_Cloth_BWL" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+			<Size><AbsDimension x="40" y="20"/></Size>
+			<Anchors><Anchor point="TOPLEFT"><Offset x="150" y="-112"/></Anchor></Anchors>
+			<FontString inherits="ChatFontNormal"/>
+		</EditBox>
+		<EditBox name="$parent_Cloth_AQ40" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+			<Size><AbsDimension x="40" y="20"/></Size>
+			<Anchors><Anchor point="TOPLEFT"><Offset x="200" y="-112"/></Anchor></Anchors>
+			<FontString inherits="ChatFontNormal"/>
+		</EditBox>
+		<EditBox name="$parent_Cloth_NAXX" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+			<Size><AbsDimension x="40" y="20"/></Size>
+			<Anchors><Anchor point="TOPLEFT"><Offset x="250" y="-112"/></Anchor></Anchors>
+			<FontString inherits="ChatFontNormal"/>
+		</EditBox>
+		<EditBox name="$parent_Cloth_KARA" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+			<Size><AbsDimension x="40" y="20"/></Size>
+			<Anchors><Anchor point="TOPLEFT"><Offset x="300" y="-112"/></Anchor></Anchors>
+			<FontString inherits="ChatFontNormal"/>
+		</EditBox>
+		
+		<!-- Оружие: BWL, AQ40, NAXX, KARA -->
+		<EditBox name="$parent_Weapon_BWL" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+			<Size><AbsDimension x="40" y="20"/></Size>
+			<Anchors><Anchor point="TOPLEFT"><Offset x="150" y="-144"/></Anchor></Anchors>
+			<FontString inherits="ChatFontNormal"/>
+		</EditBox>
+		<EditBox name="$parent_Weapon_AQ40" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+			<Size><AbsDimension x="40" y="20"/></Size>
+			<Anchors><Anchor point="TOPLEFT"><Offset x="200" y="-144"/></Anchor></Anchors>
+			<FontString inherits="ChatFontNormal"/>
+		</EditBox>
+		<EditBox name="$parent_Weapon_NAXX" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+			<Size><AbsDimension x="40" y="20"/></Size>
+			<Anchors><Anchor point="TOPLEFT"><Offset x="250" y="-144"/></Anchor></Anchors>
+			<FontString inherits="ChatFontNormal"/>
+		</EditBox>
+		<EditBox name="$parent_Weapon_KARA" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+			<Size><AbsDimension x="40" y="20"/></Size>
+			<Anchors><Anchor point="TOPLEFT"><Offset x="300" y="-144"/></Anchor></Anchors>
+			<FontString inherits="ChatFontNormal"/>
+		</EditBox>
+		
+		<!-- Аксессуары: BWL, AQ40, NAXX, KARA -->
+		<EditBox name="$parent_Accessory_BWL" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+			<Size><AbsDimension x="40" y="20"/></Size>
+			<Anchors><Anchor point="TOPLEFT"><Offset x="150" y="-176"/></Anchor></Anchors>
+			<FontString inherits="ChatFontNormal"/>
+		</EditBox>
+		<EditBox name="$parent_Accessory_AQ40" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+			<Size><AbsDimension x="40" y="20"/></Size>
+			<Anchors><Anchor point="TOPLEFT"><Offset x="200" y="-176"/></Anchor></Anchors>
+			<FontString inherits="ChatFontNormal"/>
+		</EditBox>
+		<EditBox name="$parent_Accessory_NAXX" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+			<Size><AbsDimension x="40" y="20"/></Size>
+			<Anchors><Anchor point="TOPLEFT"><Offset x="250" y="-176"/></Anchor></Anchors>
+			<FontString inherits="ChatFontNormal"/>
+		</EditBox>
+		<EditBox name="$parent_Accessory_KARA" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+			<Size><AbsDimension x="40" y="20"/></Size>
+			<Anchors><Anchor point="TOPLEFT"><Offset x="300" y="-176"/></Anchor></Anchors>
+			<FontString inherits="ChatFontNormal"/>
+		</EditBox>
+		
+	<!-- Минимальное качество для Loot Assistant -->
+	<EditBox name="$parent_MinQuality" inherits="InputBoxTemplate" numeric="true" autoFocus="false">
+		<Size><AbsDimension x="40" y="20"/></Size>
+		<Anchors><Anchor point="TOPLEFT"><Offset x="28" y="-235"/></Anchor></Anchors>
+		<FontString inherits="ChatFontNormal"/>
+	</EditBox>
+		
+		<!-- Кнопка сохранения Item DKP -->
+	<Button name="$parentSaveButton" inherits="UIPanelButtonTemplate" text="Сохранить">
+		<Size>
+			<AbsDimension x="100" y="23" />
+		</Size>
+		<Anchors>
+			<Anchor point="TOPLEFT">
+				<Offset x="134" y="-265"/>
+			</Anchor>
+		</Anchors>
+		<Scripts>
+			<OnClick>
+				SOTA_SaveItemDKPValues();
+			</OnClick>
+		</Scripts>
+	</Button>
 		</Frames>
 	</Frame>
 	

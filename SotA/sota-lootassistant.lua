@@ -31,6 +31,10 @@ local ItemsInTrade = {}
 -- Флаг успешного завершения трейда (оба игрока нажали Accept)
 local TradeAccepted = false
 
+-- Таймер для проверки неудавшихся выдач (если LOOT_SLOT_CLEARED не пришло)
+local GivingTimeout = 5.0  -- 5 секунд
+local GivingTimers = {}  -- {lootKey = timeElapsed}
+
 --[[
 --	======================
 --	МОДУЛЬ: LootScanner
@@ -113,6 +117,16 @@ function SOTA_LA_OnLootOpened()
 	local numItems = GetNumLootItems()
 	if not numItems or numItems == 0 then return end
 	
+	-- Удаляем старые предметы со статусом "taken" (они из предыдущего лута)
+	for key, entry in pairs(SOTA_ScannedLoot) do
+		if entry.status == "taken" then
+			SOTA_ScannedLoot[key] = nil
+			if SOTA_LA_DebugMode then
+				localEcho(string.format("[LA DEBUG] Удален старый taken предмет: %s", entry.name))
+			end
+		end
+	end
+	
 	local scannedCount = 0
 	
 	for slot = 1, numItems do
@@ -165,18 +179,46 @@ end
 
 -- Обновление slot индексов после выдачи предметов
 function SOTA_LA_OnLootSlotCleared(slot)
-	-- После выдачи предмета все слоты выше сдвигаются вниз
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] LOOT_SLOT_CLEARED: slot=%d", slot))
+	end
+	
+	-- Ищем предмет который был в процессе выдачи из этого слота
 	for key, entry in pairs(SOTA_ScannedLoot) do
-		if entry.slot > slot then
-			entry.slot = entry.slot - 1
-		elseif entry.slot == slot then
-			-- Предмет был выдан/взят
-			if entry.status == "given" then
+		if entry.slot == slot then
+			if entry.status == "giving" then
+				-- Предмет успешно выдан - удаляем из списка
+				SOTA_ScannedLoot[key] = nil
+				GivingTimers[key] = nil  -- Останавливаем таймер
+				localEcho(string.format("[Loot Assistant] Предмет %s успешно выдан и удален из списка", entry.name))
+				if SOTA_LA_DebugMode then
+					localEcho(string.format("[LA DEBUG] Удален предмет %s (slot=%d)", entry.name, slot))
+				end
+			elseif entry.status == "given" then
 				-- Уже помечен как выданный, всё ОК
+				SOTA_ScannedLoot[key] = nil
+				GivingTimers[key] = nil
+			elseif entry.status == "pending" then
+				-- Предмет еще не разыгран - сбрасываем slot, оставляем доступным для разрола
+				entry.slot = 0
+				if SOTA_LA_DebugMode then
+					localEcho(string.format("[LA DEBUG] Предмет %s подобран, но доступен для разрола", entry.name))
+				end
 			else
-				-- Предмет взят не через наш интерфейс
-				entry.status = "taken"
+				-- Предмет был в процессе (rolling/finished) но взят не через наш интерфейс
+				-- Помечаем как taken только если нет победителя
+				if not entry.winner then
+					entry.status = "taken"
+					entry.slot = 0
+				else
+					-- Есть победитель - помечаем что нужен трейд
+					entry.needsTrade = true
+					entry.slot = 0
+				end
 			end
+		elseif entry.slot > slot then
+			-- После выдачи предмета все слоты выше сдвигаются вниз
+			entry.slot = entry.slot - 1
 		end
 	end
 	
@@ -240,9 +282,17 @@ function SOTA_LA_StartRollForItem(lootKey)
 		return false
 	end
 	
-	-- Формируем команду для SOTA_StartAuction
-	-- Формат: [минбид] itemlink или просто itemlink (минбид 100 по умолчанию)
-	local msg = entry.link
+	-- Получаем минимальную ставку для этого предмета
+	local minBid = SOTA_GetItemPriceForAuction(entry.link)
+	
+	-- Формируем команду для SOTA_StartAuction: "минбид itemlink"
+	-- ВАЖНО: minBid должен быть ПЕРВЫМ словом без скобок, чтобы SOTA_StartAuction смог его распарсить
+	local msg = string.format("%d %s", minBid, entry.link)
+	
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] StartRoll: предмет=%s, minBid=%d", entry.name, minBid))
+		localEcho(string.format("[LA DEBUG] Команда для SOTA_StartAuction: '%s'", msg))
+	end
 	
 	-- Запускаем аукцион через SOTA
 	SOTA_StartAuction(msg)
@@ -347,34 +397,78 @@ function SOTA_LA_GiveItemFromLoot(lootKey)
 		return
 	end
 	
-	-- Проверяем, открыто ли окно лута
-	if GetNumLootItems() == 0 then
-		localEcho("[Loot Assistant] Окно лута закрыто. Используйте трейд для выдачи.")
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] GiveItemFromLoot: предмет=%s, slot=%d, winner=%s", entry.name, entry.slot, entry.winner))
+	end
+	
+	-- Проверяем, открыто ли окно лута и предмет из лута (не из сумки)
+	if entry.slot == 0 or not LootWindowOpen or GetNumLootItems() == 0 then
+		if SOTA_LA_DebugMode then
+			localEcho(string.format("[LA DEBUG] Окно лута закрыто или предмет из сумки (slot=%d, LootWindowOpen=%s, GetNumLootItems=%d)", 
+				entry.slot, tostring(LootWindowOpen), GetNumLootItems()))
+		end
+		localEcho("[Loot Assistant] Окно лута закрыто или предмет в сумке. Используйте трейд для выдачи.")
 		entry.needsTrade = true
 		SOTA_LA_RefreshList()
 		return
 	end
 	
-	-- Находим индекс победителя в рейде
-	local candidateIndex = SOTA_LA_FindRaidMemberIndex(entry.winner)
+	-- Находим индекс победителя в списке кандидатов
+	-- GetMasterLootCandidate(index) - возвращает имя игрока по индексу (1-40)
+	local candidateIndex = nil
+	
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] Ищем кандидата %s среди всех позиций (1-40)", entry.winner))
+		localEcho("[LA DEBUG] Список всех кандидатов:")
+	end
+	
+	-- Обходим все 40 позиций независимо от количества игроков
+	for ci = 1, 40 do
+		local candidateName = GetMasterLootCandidate(ci)
+		
+		if candidateName then
+			if SOTA_LA_DebugMode then
+				localEcho(string.format("[LA DEBUG]   %d: %s", ci, candidateName))
+			end
+			
+			if candidateName == entry.winner then
+				candidateIndex = ci
+				if SOTA_LA_DebugMode then
+					localEcho(string.format("[LA DEBUG] ✓ Найден кандидат %s на позиции %d", candidateName, ci))
+				end
+				break
+			end
+		end
+	end
+	
 	if not candidateIndex then
-		localEcho(string.format("[Loot Assistant] Игрок %s не найден в рейде/группе", entry.winner))
+		localEcho(string.format("[Loot Assistant] Игрок %s не найден в списке кандидатов", entry.winner))
+		-- Автоматически переводим в режим трейда
+		entry.needsTrade = true
+		entry.status = "finished"
+		SOTA_LA_RefreshList()
 		return
+	end
+	
+	if SOTA_LA_DebugMode then
+		localEcho(string.format("[LA DEBUG] GiveMasterLoot(slot=%d, candidateIndex=%d)", entry.slot, candidateIndex))
 	end
 	
 	-- Выдаём предмет
 	GiveMasterLoot(entry.slot, candidateIndex)
 	
-	-- Обновляем статус
-	entry.status = "given"
+	-- Помечаем как "в процессе выдачи" - удалим после LOOT_SLOT_CLEARED
+	entry.status = "giving"
+	entry.lootKey = lootKey  -- Запоминаем ключ для удаления
 	
-	-- Удаляем предмет из списка после выдачи
-	SOTA_ScannedLoot[lootKey] = nil
+	-- Запускаем таймер для проверки неудачной выдачи
+	GivingTimers[lootKey] = 0
+	
 	SOTA_LA_RefreshList()
 	
 	-- Логируем в чат
 	SendChatMessage(string.format("Выдан %s → %s", entry.link, entry.winner), "RAID")
-	localEcho(string.format("[Loot Assistant] Выдан %s игроку %s и удален из списка", entry.name, entry.winner))
+	localEcho(string.format("[Loot Assistant] Попытка выдать %s игроку %s...", entry.name, entry.winner))
 end
 
 -- Поиск предмета в сумках
@@ -484,6 +578,33 @@ function SOTA_LA_CloseWindow()
 	end
 end
 
+-- OnUpdate для проверки таймеров выдачи предметов
+function SOTA_LA_OnUpdate(elapsed)
+	-- Проверяем таймеры неудавшихся выдач
+	for key, timer in pairs(GivingTimers) do
+		GivingTimers[key] = timer + elapsed
+		
+		if GivingTimers[key] >= GivingTimeout then
+			local entry = SOTA_ScannedLoot[key]
+			if entry and entry.status == "giving" then
+				-- Таймаут - предмет не был выдан (инвентарь переполнен?)
+				entry.status = "finished"  -- Возвращаем статус для повторной попытки
+				GivingTimers[key] = nil
+				
+				localEcho(string.format("[Loot Assistant] Не удалось выдать %s игроку %s (возможно, инвентарь полон)", entry.name, entry.winner))
+				if SOTA_LA_DebugMode then
+					localEcho(string.format("[LA DEBUG] Таймаут выдачи для %s (key=%s)", entry.name, key))
+				end
+				
+				SOTA_LA_RefreshList()
+			else
+				-- Предмет уже не в списке или статус изменился
+				GivingTimers[key] = nil
+			end
+		end
+	end
+end
+
 -- Обновление списка предметов в UI
 function SOTA_LA_RefreshList()
 	SOTA_LA_UpdateItemList()
@@ -529,17 +650,23 @@ function SOTA_LA_UpdateItemList()
 			local entry = itemData.entry
 			local key = itemData.key
 			
-			-- Формируем одну текстовую строку \"Имя (статус)\"
+			-- Формируем одну текстовую строку "Имя (статус)"
 			local line = entry.name or "Неизвестно"
 			local statusStr = ""
 			if entry.status == "pending" then
-				statusStr = "Ожидает разрола"
+				if entry.slot == 0 then
+					statusStr = "В сумке"
+				else
+					statusStr = "Ожидает разрола"
+				end
 			elseif entry.status == "rolling" then
 				statusStr = "Аукцион идёт..."
 			elseif entry.status == "finished" then
 				statusStr = "Победитель: "..(entry.winner or "?")
 			elseif entry.status == "given" then
 				statusStr = "Выдан: "..(entry.winner or "?")
+			elseif entry.status == "taken" then
+				statusStr = "Подобран кем-то"
 			else
 				statusStr = entry.status or ""
 			end
@@ -940,9 +1067,12 @@ SlashCmdList["SOTALA"] = function(msg)
 		local count = 0
 		for k,v in pairs(SOTA_ScannedLoot) do 
 			count = count + 1
-			DEFAULT_CHAT_FRAME:AddMessage("  Item: "..v.name.." - "..v.status)
+			DEFAULT_CHAT_FRAME:AddMessage(string.format("  Item: %s - status=%s, slot=%d, winner=%s", 
+				v.name, v.status, v.slot or 0, v.winner or "нет"))
 		end
 		DEFAULT_CHAT_FRAME:AddMessage("Всего предметов: "..count)
+		DEFAULT_CHAT_FRAME:AddMessage("LootWindowOpen: "..(LootWindowOpen and "ДА" or "НЕТ"))
+		DEFAULT_CHAT_FRAME:AddMessage("GetNumLootItems: "..GetNumLootItems())
 		
 		-- Проверка кнопок
 		for i = 1, 3 do

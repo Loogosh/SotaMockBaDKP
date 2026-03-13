@@ -4,7 +4,7 @@
 	<!-- SotA Dashboard -->
 	<Frame name="DashboardUIFrame" parent="UIParent" toplevel="true" hidden="true">
 		<Size>
-			<AbsDimension x="368" y="80" />
+			<AbsDimension x="408" y="80" />
 		</Size>
 		<Anchors>
 			<Anchor point="TOPLEFT">
@@ -15,7 +15,7 @@
 			<!-- Current item frame -->
 			<Frame name="$parentItem">
 				<Size>
-					<AbsDimension x="368" y="40" />
+					<AbsDimension x="408" y="40" />
 				</Size>
 				<Anchors>
 					<Anchor point="TOPLEFT">
@@ -223,7 +223,33 @@
 					</OnLeave>
 				</Scripts>
 			</Button>
-				</Frames>
+			<!-- Button 2E: Loot Assistant -->
+			<Button name="$parentLootAssistantButton" inherits="ActionButtonTemplate" frameStrata="HIGH" hidden="false">
+				<Size>
+					<AbsDimension x="32" y="32" />
+				</Size>
+				<Anchors>
+					<Anchor point="LEFT">
+						<Offset>
+							<AbsDimension x="372" y="0" />
+						</Offset>
+					</Anchor>
+				</Anchors>
+				<NormalTexture file="Interface\ICONS\Spell_Shadow_SoothingKiss.blp" />
+				<PushedTexture file="Interface\ICONS\Spell_Shadow_SoothingKiss.blp" />
+				<Scripts>
+					<OnClick>
+						SOTA_ToggleLootAssistant();
+					</OnClick>
+					<OnEnter>
+						SOTA_ShowDashboardToolTip(this, "Toggle Loot Assistant");
+					</OnEnter>
+					<OnLeave>
+						SOTA_HideDashboardToolTip(this);
+					</OnLeave>
+				</Scripts>
+			</Button>
+			</Frames>
 				<Layers>
 					<Layer level="ARTWORK">
 						<FontString inherits="GameFontNormal" text="SOTA Master:">
