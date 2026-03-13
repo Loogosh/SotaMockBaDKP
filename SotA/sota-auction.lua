@@ -293,15 +293,16 @@ function SOTA_HandlePlayerBid(sender, message)
 		end;
 	end
 
-	-- Проверка минимальной ставки для всех
+	-- Проверка минимальной ставки для всех (кроме all-in)
 	if not(userWentAllIn) then
 		if (dkp < minimumBid) then
 			SOTA_whisper(sender, string.format("Нужно поставить минимум %d ДКП - ставка проигнорирована.", minimumBid));
 			return;
 		end;
 	else
-		if (dkp < hiBid + 1) then
-			SOTA_whisper(sender, string.format("ОЛЛ-ИН меньше или равен предыдущей ставке в %d ДКП - ОЛЛ-ИН проигнорирован.", hiBid));
+		-- Для all-in проверяем что ставка больше текущей
+		if (dkp <= hiBid) then
+			SOTA_whisper(sender, string.format("ОЛЛ-ИН должен быть больше текущей ставки %d ДКП - ОЛЛ-ИН проигнорирован.", hiBid));
 			return;
 		end;
 	end;
@@ -475,6 +476,11 @@ end;
 --	Show top <n> in bid window
 --]]
 function SOTA_UpdateBidElements()
+	-- Ensure UI rows are initialized
+	if not getglobal("AuctionUIFrameTableListEntry1") and AuctionUIFrameTableList then
+		SOTA_AuctionUIInit();
+	end
+
 	local bidder, bid, playerclass, rank;
 	for n=1, MAX_BIDS, 1 do
 		if table.getn(IncomingBidsTable) < n then
@@ -498,14 +504,16 @@ function SOTA_UpdateBidElements()
 		local color = SOTA_GetClassColorCodes(playerclass);
 
 		local frame = getglobal("AuctionUIFrameTableListEntry"..n);
-		getglobal(frame:GetName().."Bidder"):SetText(bidder);
-		getglobal(frame:GetName().."Bidder"):SetTextColor((color[1]/255), (color[2]/255), (color[3]/255), 255);
-		getglobal(frame:GetName().."Bid"):SetTextColor((bidcolor[1]/255), (bidcolor[2]/255), (bidcolor[3]/255), 255);
-		getglobal(frame:GetName().."Bid"):SetText(bid);
-		getglobal(frame:GetName().."Rank"):SetText(rank);
+		if frame then
+			getglobal(frame:GetName().."Bidder"):SetText(bidder);
+			getglobal(frame:GetName().."Bidder"):SetTextColor((color[1]/255), (color[2]/255), (color[3]/255), 255);
+			getglobal(frame:GetName().."Bid"):SetTextColor((bidcolor[1]/255), (bidcolor[2]/255), (bidcolor[3]/255), 255);
+			getglobal(frame:GetName().."Bid"):SetText(bid);
+			getglobal(frame:GetName().."Rank"):SetText(rank);
 
-		SOTA_RefreshButtonStates();
-		frame:Show();
+			SOTA_RefreshButtonStates();
+			frame:Show();
+		end
 	end
 end
 

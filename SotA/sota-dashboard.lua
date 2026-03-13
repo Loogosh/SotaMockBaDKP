@@ -1518,15 +1518,25 @@ end;
 
 
 function SOTA_OnChatMsgAddon(event, prefix, msg, channel, sender)
-	--echo(string.format("Prefix=%s, MSG=%s", prefix, msg));
+	--echo(string.format("[SOTA] Addon message: Prefix=%s, MSG=%s, Channel=%s, Sender=%s", prefix, msg, channel, sender));
 	
 	-- Handle MDKP client messages (bids)
 	if prefix == MDKP_CLT_PREFIX then
+		-- Only process bids if we are the master
+		if not SOTA_IsMaster() then
+			debugEcho("[SOTA] Ignoring client message - not master")
+			return
+		end
+		
+		--echo(string.format("[SOTA] Processing client message from %s", sender))
 		local version, msgType, payload = SOTA_ParseAddonMessage(msg)
 		
 		if not msgType then
+			--echo("[SOTA] Failed to parse message type")
 			return
 		end
+		
+		--echo(string.format("[SOTA] Message type: %s", msgType))
 		
 		if msgType == "HELLO" then
 			-- Client announces itself
@@ -1538,12 +1548,16 @@ function SOTA_OnChatMsgAddon(event, prefix, msg, channel, sender)
 			local bidType = payload.type or "ms"
 			local bidValue = payload.value
 			
+			--echo(string.format("[SOTA] Bid received: type=%s, value=%s", bidType, bidValue))
+			
 			if not bidValue then
+				--echo("[SOTA] No bid value, ignoring")
 				return
 			end
 			
 			-- Convert to old format for SOTA_HandlePlayerBid
 			local command = bidType .. " " .. bidValue
+			--echo(string.format("[SOTA] Calling HandlePlayerBid: sender=%s, command=%s", sender, command))
 			SOTA_HandlePlayerBid(sender, command)
 		end
 		

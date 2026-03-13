@@ -9,6 +9,43 @@ MDKP_SRV_PREFIX = "MDKP_SRV"  -- Server → Client messages
 MDKP_CLT_PREFIX = "MDKP_CLT"  -- Client → Server messages
 MDKP_PROTOCOL_VERSION = "1"
 
+-- Backport string.match for older Lua versions if missing
+if not string.match then
+	function string.match(s, pattern)
+		if not s or not pattern then return nil end
+		local results = {string.find(s, pattern)}
+		if table.getn(results) > 2 then
+			-- string.find returns: start, end, capture1, capture2, ...
+			-- Remove first two elements (start, end) and return captures
+			table.remove(results, 1)
+			table.remove(results, 1)
+			return unpack(results)
+		end
+		return nil
+	end
+end
+
+-- Compatibility wrappers for chat API (Retail/Classic)
+local RegisterAddonMessagePrefixCompat = function(prefix)
+	if RegisterAddonMessagePrefix then
+		return RegisterAddonMessagePrefix(prefix)
+	elseif C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+		return C_ChatInfo.RegisterAddonMessagePrefix(prefix)
+	end
+end
+
+local SendAddonMessageCompat = function(prefix, msg, channel, target)
+	if SendAddonMessage then
+		if channel == "WHISPER" and target then
+			return SendAddonMessage(prefix, msg, channel, target)
+		else
+			return SendAddonMessage(prefix, msg, channel)
+		end
+	elseif C_ChatInfo and C_ChatInfo.SendAddonMessage then
+		return C_ChatInfo.SendAddonMessage(prefix, msg, channel, target)
+	end
+end
+
 -- Track which clients have the addon (responded to HELLO)
 local MDKP_KnownClients = {}
 
@@ -18,8 +55,8 @@ local MDKP_KnownClients = {}
 --]]
 function SOTA_InitCommunication()
 	-- Register addon message prefixes
-	RegisterAddonMessagePrefix(MDKP_SRV_PREFIX)
-	RegisterAddonMessagePrefix(MDKP_CLT_PREFIX)
+	RegisterAddonMessagePrefixCompat(MDKP_SRV_PREFIX)
+	RegisterAddonMessagePrefixCompat(MDKP_CLT_PREFIX)
 	
 	debugEcho("MDKP Communication module initialized")
 end
@@ -91,7 +128,7 @@ function SOTA_SendAddonMessage(msgType, payload, fallbackMsgInfo)
 		channel = "PARTY"
 	end
 	
-	SendAddonMessage(MDKP_SRV_PREFIX, msg, channel)
+	SendAddonMessageCompat(MDKP_SRV_PREFIX, msg, channel)
 	
 	debugEcho("Sent addon message: " .. msgType)
 	
@@ -107,7 +144,7 @@ end
 --]]
 function SOTA_SendAddonWhisper(msgType, payload, target)
 	local msg = SOTA_BuildAddonMessage(msgType, payload)
-	SendAddonMessage(MDKP_SRV_PREFIX, msg, "WHISPER", target)
+	SendAddonMessageCompat(MDKP_SRV_PREFIX, msg, "WHISPER", target)
 end
 
 --[[
@@ -168,7 +205,8 @@ function SOTA_SendBidUpdate(bidder, bid, bidType, rank)
 		bidder = bidder,
 		bid = bid,
 		type = (bidType == 1 and "ms" or "os"),
-		rank = rank or ""
+		rank = rank or "",
+		timeLeft = Seconds or 0
 	}
 	
 	SOTA_SendAddonMessage("BID_UPDATE", payload, nil)
