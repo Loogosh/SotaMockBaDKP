@@ -323,6 +323,17 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
+				<!-- Timer text above item frame -->
+				<FontString name="AuctionUIFrameTimerText" inherits="GameFontNormalLarge" text="">
+					<Anchors>
+						<Anchor point="TOP">
+							<Offset>
+								<AbsDimension x="0" y="-30" />
+							</Offset>
+						</Anchor>
+					</Anchors>
+					<Color r="1" g="0.82" b="0" />
+				</FontString>
 			</Layer>
 		</Layers>
 		<Scripts>

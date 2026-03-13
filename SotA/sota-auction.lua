@@ -36,6 +36,12 @@ function SOTA_SetAuctionState(auctionState, seconds)
 	end
 	AuctionState = auctionState;
 	SOTA_setSecondCounter(seconds);
+
+	-- Update timer display in Auction UI
+	local timerText = getglobal("AuctionUIFrameTimerText");
+	if timerText and Seconds and Seconds >= 0 then
+		timerText:SetText(string.format("Осталось: %d сек", Seconds));
+	end
 end
 
 
@@ -113,7 +119,7 @@ end
 function SOTA_CheckAuctionState()
 	local state = SOTA_GetAuctionState();
 	
-	debugEcho(string.format("SOTA_CheckAuctionState called, state = %d", STATE_AUCTION_PAUSED));
+	--debugEcho(string.format("SOTA_CheckAuctionState called, state = %d", STATE_AUCTION_PAUSED));
 
 	if state == STATE_NONE or state == STATE_AUCTION_PAUSED then
 		return;
@@ -177,6 +183,14 @@ function SOTA_CheckAuctionState()
 	if state == STATE_COMPLETE then
 		--	 We're idle
 		state = STATE_NONE;
+	end
+
+	-- Refresh timer text every tick while auction is running/paused
+	local timerText = getglobal("AuctionUIFrameTimerText");
+	if timerText and (state ~= STATE_NONE) then
+		local secs = SOTA_GetSecondCounter() or 0;
+		if secs < 0 then secs = 0 end
+		timerText:SetText(string.format("Осталось: %d сек", secs));
 	end
 
 	SOTA_RefreshButtonStates();
@@ -307,8 +321,12 @@ function SOTA_HandlePlayerBid(sender, message)
 		end;
 	end;
 
-	if Seconds < SOTA_CONFIG_AuctionExtension then
-		Seconds = SOTA_CONFIG_AuctionExtension;
+	-- Extend auction timer on valid bid:
+	-- If timer is low, raise it up to configured extension (cap), but never above.
+	if SOTA_CONFIG_AuctionExtension and SOTA_CONFIG_AuctionExtension > 0 then
+		if (Seconds or 0) < SOTA_CONFIG_AuctionExtension then
+			Seconds = SOTA_CONFIG_AuctionExtension;
+		end
 	end
 	
 	if userWentAllIn then
